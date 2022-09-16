@@ -1,32 +1,34 @@
-from networkx.algorithms.components.connected import connected_components
-from vectorizedMinHash import VectorizedMinHash,fastNGramHashes
-from collections import defaultdict, Hashable, Counter
-from datasketch import MinHash, MinHashLSH
-from difflib import SequenceMatcher
-from itertools import combinations
-from unidecode import unidecode
-from contextlib import closing
-from bs4 import BeautifulSoup
-from bounter import bounter
-from copy import deepcopy
-from nltk import ngrams
-import multiprocessing
-import numpy as np
-import functools
-import distutils
-import requests
-import argparse
-import networkx
-import sqlite3
-import zipfile
-import random
-import codecs
-import shutil
+import os
 import time
 import uuid
 import glob
 import json
-import os
+import random
+import codecs
+import shutil
+import sqlite3
+import zipfile
+import argparse
+import distutils
+import functools
+import multiprocessing
+from copy import deepcopy
+from contextlib import closing
+from itertools import combinations
+from difflib import SequenceMatcher
+from collections.abc import Hashable
+from collections import defaultdict, Counter
+
+import requests
+import networkx
+import numpy as np
+from nltk import ngrams
+from bounter import bounter
+from bs4 import BeautifulSoup
+from unidecode import unidecode
+from datasketch import MinHash, MinHashLSH
+from vectorizedMinHash import VectorizedMinHash, fastNGramHashes
+from networkx.algorithms.components.connected import connected_components
 
 
 try:
