@@ -10,7 +10,7 @@ from utils import get_windows, get_cacheable
 from db import write_hashbands
 
 
-def get_all_hashbands(**kwargs):
+def get_all_hashbands(kwargs):
     """Generate and save hashbands for each infile"""
     pool = multiprocessing.Pool()
     buff = [[idx, i] for idx, i in enumerate(kwargs['infiles'])]

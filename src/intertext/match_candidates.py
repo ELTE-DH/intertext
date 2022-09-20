@@ -5,10 +5,10 @@ from itertools import combinations
 from db import write_candidates, stream_hashbands
 
 
-def get_all_match_candidates(**kwargs):
+def get_all_match_candidates(kwargs):
     """Find all hashbands that have multiple distinct file_ids and save as match candidates"""
     rows = []
-    for row in stream_hashbands(**kwargs):
+    for row in stream_hashbands(kwargs):
         rows.append(row)
         # the hashbands table is our largest data artifact - paginate in blocks
         if len(rows) >= kwargs['batch_size']:

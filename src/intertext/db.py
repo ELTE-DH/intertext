@@ -7,7 +7,7 @@ from collections import defaultdict
 from config import cache_location, row_delimiter, field_delimiter
 
 
-def clear_db(**_):
+def clear_db():
     """Clear the extant db"""
     if Path('db').exists():
         shutil.rmtree('db')
@@ -176,7 +176,7 @@ def repair_database(**_):
     raise sqlite3.DatabaseError
 
 
-def stream_hashbands(**kwargs):
+def stream_hashbands(kwargs):
     """Stream [hashband, file_id, window_id] sorted by hashband"""
     if kwargs.get('verbose'):
         print(' * querying for hashbands')
@@ -213,7 +213,7 @@ def stream_hashbands(**kwargs):
                         yield [hashband] + j
 
 
-def stream_candidate_file_id_pairs(**kwargs):
+def stream_candidate_file_id_pairs(kwargs):
     """Stream [file_id_a, file_id_b] pairs for files with matching hashbands"""
     if kwargs.get('verbose'):
         print(' * querying for candidate file id pairs')
@@ -234,7 +234,7 @@ def stream_candidate_file_id_pairs(**kwargs):
                 yield [int(file_id_a), int(file_id_b)]
 
 
-def stream_matching_file_id_pairs(**kwargs):
+def stream_matching_file_id_pairs(kwargs):
     """Stream [file_id_a, file_id_b] for file ids that have verified matches"""
     if kwargs.get('db') == 'sqlite':
         with closing(get_db('matches', **kwargs)) as db:

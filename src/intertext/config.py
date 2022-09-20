@@ -131,7 +131,7 @@ def copy_client(client_dir, output_dir):
     shutil.copytree(client_dir / 'build', output_dir)
 
 
-def process_kwargs(**kwargs):
+def process_kwargs(kwargs):
     """Return a list of the infiles to be processed"""
 
     # check xml page kwargs
@@ -151,33 +151,28 @@ def process_kwargs(**kwargs):
         banished_files = sorted(glob.glob(kwargs['banish_glob']))
         infiles += banished_files
         banished_file_set = set(banished_files)
-        banished_file_ids = set()
-        for file_idx, file in enumerate(infiles):
-            if file in banished_file_set:
-                banished_file_ids.add(file_idx)
-        kwargs['banished_file_ids'] = tuple(banished_file_ids)
+        kwargs['banished_file_ids'] = tuple({file_idx for file_idx, file in enumerate(infiles)
+                                             if file in banished_file_set})
     kwargs['infiles'] = infiles
 
     # identify excluded files and their file ids
     if kwargs['exclude_glob']:
-        exclude_set = set(sorted(glob.glob(kwargs['exclude_glob'])))
-        excluded_file_ids = set()
-        for file_idx, file in enumerate(infiles):
-            if file in exclude_set:
-                excluded_file_ids.add(file_idx)
-        kwargs['excluded_file_ids'] = tuple(excluded_file_ids)
+        exclude_set = set(glob.glob(kwargs['exclude_glob']))
+        kwargs['excluded_file_ids'] = tuple({file_idx for file_idx, file in enumerate(infiles) if file in exclude_set})
 
     # get the metadata (if any)
-    kwargs['metadata'] = get_metadata(**kwargs)
+    kwargs['metadata'] = get_metadata(kwargs)
 
-    # get the focal text index (if any)
-    kwargs['only_index'] = get_only_index(**kwargs)
+    # get the focal text index number (if any) of the only file from which matches should be retained
+    kwargs['only_index'] = None
+    if kwargs.get('only') is not None:
+        kwargs['only_index'] = kwargs['infiles'].index(kwargs['only'])
 
     # return the processed kwargs
     return kwargs
 
 
-def get_metadata(**kwargs):
+def get_metadata(kwargs):
     """if the user provided metadata, store it in the kwargs"""
     metadata = json.load(open(kwargs['metadata'])) if kwargs['metadata'] else {}
     for i in kwargs['infiles']:
@@ -194,15 +189,7 @@ def get_metadata(**kwargs):
     return metadata
 
 
-def get_only_index(**kwargs):
-    """Return the index number of the only file from which matches should be retained"""
-    if kwargs.get('only', None) is not None:
-        return kwargs['infiles'].index(kwargs['only'])
-    else:
-        return None
-
-
-def prepare_output_directories(**kwargs):
+def prepare_output_directories(kwargs):
     """Create the folders that store output objects"""
     for i in ('matches', 'scatterplots', 'indices', 'texts'):
         (kwargs['output'] / 'api' / i).mkdir(parents=True, exist_ok=True)
@@ -214,7 +201,7 @@ def prepare_output_directories(**kwargs):
         (kwargs['output'] / 'api' / 'matches' / str(i)).mkdir(parents=True, exist_ok=True)
 
 
-def write_config(**kwargs):
+def write_config(kwargs):
     # map each author and title to the files in which that string occurs and save those maps
     metadata = []
     for idx, i in enumerate(kwargs['infiles']):

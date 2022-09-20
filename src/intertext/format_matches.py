@@ -14,12 +14,12 @@ from utils import get_words, get_windows, get_window_map, get_cacheable
 from db import stream_matching_file_id_pairs, stream_file_pair_matches
 
 
-def format_all_matches(**kwargs):
+def format_all_matches(kwargs):
     """Format the match objects for each infile and store as JSON"""
     pool = multiprocessing.Pool()
-    pairs = stream_matching_file_id_pairs(**kwargs)
+    pairs = stream_matching_file_id_pairs(kwargs)
     # obtain global counts of terms across corpus
-    counts = get_word_counts(**kwargs)
+    counts = get_word_counts(kwargs)
     f = functools.partial(format_file_matches, counts, **kwargs)
     for _ in pool.map(f, pairs):
         pass
@@ -181,7 +181,7 @@ def get_sequences(arg):
     return sequences
 
 
-def get_word_counts(**kwargs):
+def get_word_counts(kwargs):
     """Return a bounter.bounter instance if user requested string likelihoods, else None"""
     if not kwargs.get('compute_probabilities'):
         return None

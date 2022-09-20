@@ -6,10 +6,10 @@ from format_matches import get_string_sim
 from db import write_matches, stream_candidate_file_id_pairs, stream_matching_candidate_windows
 
 
-def validate_all_matches(**kwargs):
+def validate_all_matches(kwargs):
     """Run match validations and yield [a_file,b_file,a_window,b_window]"""
     pool = multiprocessing.Pool()
-    pairs = stream_candidate_file_id_pairs(**kwargs)
+    pairs = stream_candidate_file_id_pairs(kwargs)
     f = functools.partial(validate_file_matches, **kwargs)
     for _ in pool.map(f, pairs):
         pass

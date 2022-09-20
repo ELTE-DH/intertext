@@ -4,7 +4,7 @@ from pathlib import Path
 from collections import defaultdict
 
 
-def create_all_match_json(**kwargs):
+def create_all_match_json(kwargs):
     """Create the output JSON to be consumed by the web client"""
     # combine all the matches in each match directory into a composite match file
     guid_to_int = defaultdict(lambda: len(guid_to_int))
@@ -22,7 +22,7 @@ def create_all_match_json(**kwargs):
 
     # create minimal representations of all matches to be sorted by each sort heuristic below
     buff = set()
-    for file_id, matches in stream_match_lists(**kwargs):
+    for file_id, matches in stream_match_lists(kwargs):
         for match_idx, match in enumerate(matches):
             if int(file_id) != int(match.get('source_file_id')):
                 continue
@@ -62,17 +62,17 @@ def create_all_match_json(**kwargs):
             json.dump(ids, out)
 
     # create the scatterplot data
-    write_scatterplots(**kwargs)
+    write_scatterplots(kwargs)
 
 
-def write_scatterplots(**kwargs):
+def write_scatterplots(kwargs):
     """Write the scatterplot JSON"""
     out_dir = kwargs['output'] / 'api' / 'scatterplots'
     for i in ('source', 'target'):
         for j in ('segment_ids', 'file_id', 'author'):
             for k in ('sum', 'mean'):
                 data_nest = defaultdict(list)
-                for file_id, matches in stream_match_lists(**kwargs):
+                for file_id, matches in stream_match_lists(kwargs):
                     for match in matches:
                         if j == 'segment_ids':
                             level = i + '.' + str(match[i + '_file_id']) + '.'
@@ -106,7 +106,7 @@ def write_scatterplots(**kwargs):
                     json.dump(scatterplot_data, out)
 
 
-def stream_match_lists(**kwargs):
+def stream_match_lists(kwargs):
     """Stream a stream of (file_id, [match, match, ...]) objects"""
     for i in (kwargs['output'] / 'api' / 'matches').glob('*'):
         file_id = i.stem

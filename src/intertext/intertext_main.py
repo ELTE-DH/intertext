@@ -27,19 +27,19 @@ TODO:
 
 
 # This is main()!
-def process_texts(**kwargs):
+def process_texts(kwargs):
     """Process the user's texts using the specified params"""
 
     # identify the infiles
-    kwargs = process_kwargs(**kwargs)
+    kwargs = process_kwargs(kwargs)
 
     # create the output directories where results will be stored
-    prepare_output_directories(**kwargs)
+    prepare_output_directories(kwargs)
 
     # update the metadata and exit if requested
     if not kwargs.get('update_metadata'):
         # remove extant db and prepare output directories
-        clear_db(**kwargs)
+        clear_db()
 
         # create the db
         initialize_db('hashbands', **kwargs)
@@ -48,42 +48,42 @@ def process_texts(**kwargs):
 
         # minhash files & store hashbands in db
         print(' * creating minhashes - using CUDA:', CUDA_AVAILABLE)
-        get_all_hashbands(**kwargs)
+        get_all_hashbands(kwargs)
 
         # find all hashbands that have multiple distict file_ids
         print(' * identifying match candidates')
-        get_all_match_candidates(**kwargs)
+        get_all_match_candidates(kwargs)
 
         # validate matches from among the candidates
         print(' * validating matches')
-        validate_all_matches(**kwargs)
+        validate_all_matches(kwargs)
 
     # banish matches if necessary
     if kwargs['banish_glob']:
-        banish_matches(**kwargs)
+        banish_matches(kwargs)
 
     # format matches into JSON for client consumption
     print(' * formatting matches')
-    format_all_matches(**kwargs)
+    format_all_matches(kwargs)
 
     # combine all matches into a single match object
     print(' * formatting JSON outputs')
-    create_all_match_json(**kwargs)
+    create_all_match_json(kwargs)
 
     # write the output config file
     print(' * writing config')
-    write_config(**kwargs)
+    write_config(kwargs)
 
     # copy input texts into outputs
     print(' * preparing text reader data')
-    create_reader_data(**kwargs)
+    create_reader_data(kwargs)
 
 ##
 # Create reader view
 ##
 
 
-def create_reader_data(**kwargs):
+def create_reader_data(kwargs):
     """Create the data to be used in the reader view"""
     for idx, i in enumerate(kwargs['infiles']):
         words = get_words(i, **get_cacheable(kwargs, {'display': True}))
@@ -95,13 +95,13 @@ def create_reader_data(**kwargs):
 ##
 
 
-def banish_matches(**kwargs):
+def banish_matches(kwargs):
     """Delete banished matches from the db"""
     if not kwargs['banish_glob']:
         return
     print(' * banishing matches')
     g = networkx.Graph()
-    for file_id_a, file_id_b in stream_matching_file_id_pairs(**kwargs):
+    for file_id_a, file_id_b in stream_matching_file_id_pairs(kwargs):
         pair_matches = stream_file_pair_matches(file_id_a, file_id_b, **kwargs)
         for _, _, window_a, window_b, sim in pair_matches:
             s = '{}.{}'.format(file_id_a, window_a)
@@ -123,4 +123,4 @@ def banish_matches(**kwargs):
 
 if __name__ == '__main__':
     configuration = parse()
-    process_texts(**configuration)
+    process_texts(configuration)
