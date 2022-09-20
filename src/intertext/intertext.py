@@ -1,15 +1,12 @@
 import os
-import time
 import uuid
 import glob
 import json
 import random
-import codecs
 import shutil
 import sqlite3
 import zipfile
 import argparse
-import distutils
 import functools
 import multiprocessing
 from copy import deepcopy
@@ -17,7 +14,7 @@ from contextlib import closing
 from itertools import combinations
 from difflib import SequenceMatcher
 from collections.abc import Hashable
-from collections import defaultdict, Counter
+from collections import defaultdict
 
 import requests
 import networkx
@@ -26,7 +23,6 @@ from nltk import ngrams
 from bounter import bounter
 from bs4 import BeautifulSoup
 from unidecode import unidecode
-from datasketch import MinHash, MinHashLSH
 from vectorizedMinHash import VectorizedMinHash, fastNGramHashes
 from networkx.algorithms.components.connected import connected_components
 
@@ -36,13 +32,6 @@ try:
     CUDA_AVAILABLE = True
 except:
     CUDA_AVAILABLE = False
-
-try:
-    from Levenshtein import ratio
-
-    LEVENSHTEIN_AVAILABLE = True
-except:
-    LEVENSHTEIN_AVAILABLE = False
 
 # global config
 config = {
@@ -86,6 +75,8 @@ TODO:
   * add support for xml + txt in same run
   * add MySQL db backend
   * if resuming, process output/config.json to get the files and file ids
+  @PG:
+  * Handling words containing punctuations only
 """
 
 # path globals
@@ -98,7 +89,7 @@ row_delimiter = '\n'
 field_delimiter = '-'
 
 # minhashing
-hasher = VectorizedMinHash(n_perm=256, mirror=True)
+hasher = VectorizedMinHash(n_perm=256)
 
 
 def parse():
@@ -164,13 +155,16 @@ def parse():
     parser.add_argument('--bounter_size', default=config['bounter_size'], help='MB allocated to bounter instance',
                         required=False)
     config.update(vars(parser.parse_args()))
-    if config.get('xml_remove_tags'): config['xml_remove_tags'] = tuple(config['xml_remove_tags'])
-    if config['update_client']: remove_client(**config)
+    if config.get('xml_remove_tags'):
+        config['xml_remove_tags'] = tuple(config['xml_remove_tags'])
+    if config['update_client']:
+        remove_client(**config)
     download_client(**config)
-    if config.get('infile_glob'): process_texts(**config)
+    if config.get('infile_glob'):
+        process_texts(**config)
 
 
-def remove_client(**kwargs):
+def remove_client(**_):
     """Remove the cached client so it will be fetched afresh"""
     print(' * clearing cached client')
     if os.path.exists(os.path.join(source_location, 'client')):
@@ -185,10 +179,11 @@ def download_client(**kwargs):
         zip_location = os.path.join(client_location, 'client.zip')
         # download the zip archive
         with open(zip_location, 'wb') as out:
-            url = f'https://lab-apps.s3-us-west-2.amazonaws.com/intertext-builds/intertext-client-{kwargs["client"]}.zip'
+            url = f'https://lab-apps.s3-us-west-2.amazonaws.com/intertext-builds/intertext-client-' \
+                  f'{kwargs["client"]}.zip'
             out.write(requests.get(url).content)
         # extract the zip archive
-        with zipfile.ZipFile(zip_location, 'r') as z:
+        with zipfile.ZipFile(zip_location) as z:
             z.extractall(client_location)
         # remove extant matches if user provided inputs
         if kwargs.get('infile_glob'):
@@ -234,7 +229,8 @@ def process_texts(**kwargs):
         validate_all_matches(**kwargs)
 
     # banish matches if necessary
-    if kwargs['banish_glob']: banish_matches(**kwargs)
+    if kwargs['banish_glob']:
+        banish_matches(**kwargs)
 
     # format matches into JSON for client consumption
     print(' * formatting matches')
@@ -261,7 +257,7 @@ def process_kwargs(**kwargs):
         raise Exception('--xml_page_tag requires --metadata to be provided')
 
     # typecheck inputs
-    assert kwargs['min_sim'] >= 1 and kwargs['min_sim'] <= 100
+    assert 1 <= kwargs['min_sim'] <= 100
 
     # get the list of infiles
     infiles = sorted(glob.glob(kwargs['infile_glob']))
@@ -304,9 +300,12 @@ def get_metadata(**kwargs):
     metadata = json.load(open(kwargs['metadata'])) if kwargs['metadata'] else {}
     for i in kwargs['infiles']:
         basename = os.path.basename(i)
-        if basename not in metadata: metadata[basename] = {}
-        if not metadata[basename].get('author'): metadata[basename]['author'] = 'Unknown'
-        if not metadata[basename].get('title'): metadata[basename]['title'] = basename
+        if basename not in metadata:
+            metadata[basename] = {}
+        if not metadata[basename].get('author'):
+            metadata[basename]['author'] = 'Unknown'
+        if not metadata[basename].get('title'):
+            metadata[basename]['title'] = basename
         for j in metadata[basename]:
             if isinstance(metadata[basename][j], str):
                 metadata[basename][j] = metadata[basename][j].strip()
@@ -333,13 +332,13 @@ def prepare_output_directories(**kwargs):
 
 def get_only_index(**kwargs):
     """Return the index number of the only file from which matches should be retained"""
-    if kwargs.get('only', None) != None:
+    if kwargs.get('only', None) is not None:
         return kwargs['infiles'].index(kwargs['only'])
     else:
         return None
 
 
-def clear_db(**kwargs):
+def clear_db(**_):
     """Clear the extant db"""
     if os.path.isdir('db'):
         shutil.rmtree('db')
@@ -378,9 +377,10 @@ def write_config(**kwargs):
 def get_all_hashbands(**kwargs):
     """Generate and save hashbands for each infile"""
     pool = multiprocessing.Pool()
-    l = [[idx, i] for idx, i in enumerate(kwargs['infiles'])]
+    buff = [[idx, i] for idx, i in enumerate(kwargs['infiles'])]
     f = functools.partial(get_file_hashbands, **kwargs)
-    for i in pool.map(f, l): pass
+    for _ in pool.map(f, buff):
+        pass
     pool.close()
     pool.join()
 
@@ -405,12 +405,12 @@ def get_file_minhashes(file_path, **kwargs):
         print(' * loading', file_path, 'minhashes from cache')
         return np.load(minhash_path)
     # run minhash algorithm on file
-    l = []
+    buff = []
     for window_idx, window in enumerate(get_windows(file_path, **get_cacheable(kwargs))):
         char_hashes = fastNGramHashes(window.lower().encode(kwargs['encoding']), n=kwargs['chargram_length'])
         fingerprint = hasher.fingerprint(char_hashes, cuda=CUDA_AVAILABLE)
-        l.append(fingerprint)
-    minhashes = np.array(l)
+        buff.append(fingerprint)
+    minhashes = np.array(buff)
     np.save(minhash_path, minhashes)
     return minhashes
 
@@ -432,19 +432,21 @@ def get_all_match_candidates(**kwargs):
     process_candidate_hashbands(rows, **kwargs)
 
 
-def process_candidate_hashbands(l, **kwargs):
+def process_candidate_hashbands(hashbands, **kwargs):
     """Given a set of hashbands, subdivide into processes to find match candidates for each"""
-    if kwargs['verbose']: print(' * processing match candidate block')
+    if kwargs['verbose']:
+        print(' * processing match candidate block')
     pool = multiprocessing.Pool()
-    l = list(subdivide(l, len(l) // multiprocessing.cpu_count()))
+    hashbands = list(subdivide(hashbands, len(hashbands) // multiprocessing.cpu_count()))
     f = functools.partial(get_hashband_match_candidates, **kwargs)
     writes = set()
-    for idx, i in enumerate(pool.map(f, l)):
+    for idx, i in enumerate(pool.map(f, hashbands)):
         writes.update(i)
-        if len(writes) >= kwargs['write_frequency'] or idx == len(l) - 1:
+        if len(writes) >= kwargs['write_frequency'] or idx == len(hashbands) - 1:
             write_candidates(writes, **kwargs)
             writes = set()
-    if writes: write_candidates(writes, **kwargs)
+    if writes:
+        write_candidates(writes, **kwargs)
     pool.close()
     pool.join()
 
@@ -461,11 +463,11 @@ def get_hashband_match_candidates(args, **kwargs):
             hashband_values.add(tup)
         elif (hashband != last_hashband) or (idx == len(args) - 1):
             last_hashband = hashband
-            if kwargs.get('only_index') != None:
+            if kwargs.get('only_index') is not None:
                 if not any([i[0] == kwargs['only_index'] for i in hashband_values]):
                     continue
             for a, b in combinations(hashband_values, 2):
-                if kwargs.get('only_index') != None:
+                if kwargs.get('only_index') is not None:
                     if a[0] != kwargs['only_index'] and b[0] != kwargs['only_index']:
                         continue
                 # skip same file matches
@@ -475,15 +477,16 @@ def get_hashband_match_candidates(args, **kwargs):
                     results.append(tuple([a[0], b[0], a[1], b[1]]))
                 else:
                     results.append(tuple([b[0], a[0], b[1], a[1]]))
-            hashband_values = set([tup])
+            hashband_values = {tup}
     return set(results)
 
 
-def subdivide(l, n):
+def subdivide(inp_list, n):
     """Subdivide list `l` into units `n` long"""
-    if not l or not n: return l
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
+    if not inp_list or not n:
+        return inp_list
+    for i in range(0, len(inp_list), n):
+        yield inp_list[i:i + n]
 
 
 ##
@@ -494,9 +497,10 @@ def subdivide(l, n):
 def validate_all_matches(**kwargs):
     """Run match validations and yield [a_file,b_file,a_window,b_window]"""
     pool = multiprocessing.Pool()
-    l = stream_candidate_file_id_pairs(**kwargs)
+    pairs = stream_candidate_file_id_pairs(**kwargs)
     f = functools.partial(validate_file_matches, **kwargs)
-    for i in pool.map(f, l): pass
+    for _ in pool.map(f, pairs):
+        pass
     pool.close()
     pool.join()
 
@@ -543,11 +547,12 @@ def validate_file_matches(file_args, **kwargs):
 def format_all_matches(**kwargs):
     """Format the match objects for each infile and store as JSON"""
     pool = multiprocessing.Pool()
-    l = stream_matching_file_id_pairs(**kwargs)
+    pairs = stream_matching_file_id_pairs(**kwargs)
     # obtain global counts of terms across corpus
     counts = get_word_counts(**kwargs)
     f = functools.partial(format_file_matches, counts, **kwargs)
-    for i in pool.map(f, l): pass
+    for _ in pool.map(f, pairs):
+        pass
     pool.close()
     pool.join()
 
@@ -558,19 +563,20 @@ def format_file_matches(counts, file_args, **kwargs):
     if kwargs.get('excluded_file_ids'):
         if file_id_a in kwargs['excluded_file_ids'] or file_id_b in kwargs['excluded_file_ids']:
             return
-    l = list(stream_file_pair_matches(file_id_a, file_id_b, **kwargs))
-    if not l: return
+    pair_matches = list(stream_file_pair_matches(file_id_a, file_id_b, **kwargs))
+    if not pair_matches:
+        return
     # check to see if this file pair has >= max allowed similarity
     a_windows = get_windows(kwargs['infiles'][file_id_a], **get_cacheable(kwargs))
     b_windows = get_windows(kwargs['infiles'][file_id_b], **get_cacheable(kwargs))
     if kwargs['max_file_sim']:
-        if (len(l) > len(a_windows) * kwargs['max_file_sim']) or \
-                (len(l) > len(b_windows) * kwargs['max_file_sim']):
+        if (len(pair_matches) > len(a_windows) * kwargs['max_file_sim']) or \
+                (len(pair_matches) > len(b_windows) * kwargs['max_file_sim']):
             print(' * file pair', *args, 'has >= max_file_sim; skipping!')
             return []
     # cluster the matches so sequential matching windows are grouped into a single match
     clusters = []
-    _, _, window_a, window_b, sims = zip(*l)
+    _, _, window_a, window_b, sims = zip(*pair_matches)
     d = defaultdict(lambda: defaultdict())
     for a, b, sim in zip(window_a, window_b, sims):
         d[a][b] = sim
@@ -585,7 +591,8 @@ def format_file_matches(counts, file_args, **kwargs):
                         cluster['sim'].append(d[a_i][b_i])
             if cluster['a'] and cluster['b']:
                 sim = int(sum(cluster['sim']) / len(cluster['sim']))
-                if sim < kwargs['min_sim']: continue
+                if sim < kwargs['min_sim']:
+                    continue
                 clusters.append({
                     'a': sorted(cluster['a']),
                     'b': sorted(cluster['b']),
@@ -651,12 +658,13 @@ def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
             'source_url': get_url(a_meta, a_windows_to_page, c['a'], **kwargs),
             'target_url': get_url(b_meta, b_windows_to_page, c['b'], **kwargs),
         })
-    return (formatted)
+    return formatted
 
 
 def get_url(meta, windows_to_page, windows, **kwargs):
     """Return the url to the first of the current windows"""
-    if not kwargs.get('xml_page_tag'): return meta.get('url', '')
+    if not kwargs.get('xml_page_tag'):
+        return meta.get('url', '')
     return meta.get('url', '').replace('$PAGE_ID', windows_to_page.get(windows[0], ''))
 
 
@@ -692,10 +700,10 @@ def get_match_strings(words, window_ids, **kwargs):
     }
 
 
-def get_sequences(l):
+def get_sequences(arg):
     """Given list of ints `l`, return [[integer sequence in l], [integer sequence in l]]"""
     sequences = []
-    for i in sorted(list(set(l))):
+    for i in sorted(set(arg)):
         # check if each is 1 more than the last, as segment ids increment by 1
         if not sequences or sequences[-1][-1] != i - 1:
             sequences.append([])
@@ -713,23 +721,24 @@ def create_all_match_json(**kwargs):
     # combine all the matches in each match directory into a composite match file
     guid_to_int = defaultdict(lambda: len(guid_to_int))
     for match_directory in glob.glob(os.path.join(kwargs['output'], 'api', 'matches', '*')):
-        # l contains the flat list of matches for a single input file
-        l = []
+        # buff contains the flat list of matches for a single input file
+        buff = []
         for j in glob.glob(os.path.join(match_directory, '*')):
             with open(j) as f:
-                l += json.load(f)
-        for i in l:
+                buff += json.load(f)
+        for i in buff:
             i['_id'] = guid_to_int[i['_id']]
         with open(os.path.join(match_directory + '.json'), 'w') as out:
-            json.dump(l, out)
+            json.dump(buff, out)
         shutil.rmtree(match_directory)
 
     # create minimal representations of all matches to be sorted by each sort heuristic below
-    l = set()
+    buff = set()
     for file_id, matches in stream_match_lists(**kwargs):
         for match_idx, match in enumerate(matches):
-            if int(file_id) != int(match.get('source_file_id')): continue
-            l.add(tuple([
+            if int(file_id) != int(match.get('source_file_id')):
+                continue
+            buff.add(tuple([
                 match_idx,
                 match.get('source_file_id'),
                 match.get('target_file_id'),
@@ -745,7 +754,7 @@ def create_all_match_json(**kwargs):
             ]))
 
     # create and store the file_id.match_index indices for each sort heuristic
-    l = list(l)
+    buff = list(buff)
     for label, idx in [
         ['length', -6],
         ['probability', -5],
@@ -755,10 +764,11 @@ def create_all_match_json(**kwargs):
         ['year', -1],
     ]:
         # only process the probability measures if they're present
-        if label == 'probability' and not kwargs.get('compute_probabilities'): continue
+        if label == 'probability' and not kwargs.get('compute_probabilities'):
+            continue
         # reverse certain sort orders to proceed max to min
-        inverse = label in set(['similarity', 'length', 'probability'])
-        sorted_list = sorted(l, key=lambda j: j[idx], reverse=inverse)
+        inverse = label in {'similarity', 'length', 'probability'}
+        sorted_list = sorted(buff, key=lambda x: x[idx], reverse=inverse)
         ids = [[int(k) if is_number(k) else k for k in i[:6]] for i in sorted_list]
         with open(os.path.join(kwargs['output'], 'api', 'indices', 'match-ids-by-{}.json'.format(label)), 'w') as out:
             json.dump(ids, out)
@@ -836,9 +846,11 @@ def initialize_db(db_name, **kwargs):
             cursor.execute('DROP TABLE IF EXISTS matches;')
             cursor.execute('CREATE TABLE hashbands (hashband TEXT, file_id INTEGER, window_id INTEGER);')
             cursor.execute(
-                'CREATE TABLE candidates (file_id_a INTEGER, file_id_b INTEGER, window_id_a INTEGER, window_id_b INTEGER, UNIQUE(file_id_a, file_id_b, window_id_a, window_id_b));')
+                'CREATE TABLE candidates (file_id_a INTEGER, file_id_b INTEGER, window_id_a INTEGER, window_id_b '
+                'INTEGER, UNIQUE(file_id_a, file_id_b, window_id_a, window_id_b));')
             cursor.execute(
-                'CREATE TABLE matches (file_id_a INTEGER, file_id_b INTEGER, window_id_a INTEGER, window_id_b INTEGER, similarity INTEGER);')
+                'CREATE TABLE matches (file_id_a INTEGER, file_id_b INTEGER, window_id_a INTEGER, window_id_b '
+                'INTEGER, similarity INTEGER);')
     else:
         for i in ['hashbands', 'candidates', 'matches']:
             path = os.path.join('db', i)
@@ -846,7 +858,7 @@ def initialize_db(db_name, **kwargs):
                 os.makedirs(path)
 
 
-def get_db(db_name, initialize=False, **kwargs):
+def get_db(db_name, initialize=False, **_):
     """Return a Sqlite DB"""
     db_location = os.path.join(cache_location, '{}.db'.format(db_name))
     db = sqlite3.connect(db_location, uri=True, timeout=2 ** 16)
@@ -865,10 +877,12 @@ def get_db(db_name, initialize=False, **kwargs):
 
 def write_hashbands(writes, **kwargs):
     """Given a db cursor and list of write operations, insert each"""
-    if not writes: return []
+    if not writes:
+        return []
     if kwargs.get('db') == 'sqlite':
         try:
-            if kwargs['verbose']: print(' * writing', len(writes), 'hashbands')
+            if kwargs['verbose']:
+                print(' * writing', len(writes), 'hashbands')
             with closing(get_db('hashbands', **kwargs)) as db:
                 cursor = db.cursor()
                 cursor.executemany('INSERT INTO hashbands (hashband, file_id, window_id) VALUES (?,?,?);', writes)
@@ -893,14 +907,17 @@ def write_hashbands(writes, **kwargs):
 
 def write_candidates(writes, **kwargs):
     """Given a db cursor and list of write operations, insert each"""
-    if not writes: return
+    if not writes:
+        return
     if kwargs.get('db') == 'sqlite':
         try:
-            if kwargs['verbose']: print(' * writing', len(writes), 'candidates')
+            if kwargs['verbose']:
+                print(' * writing', len(writes), 'candidates')
             with closing(get_db('candidates', **kwargs)) as db:
                 cursor = db.cursor()
                 cursor.executemany(
-                    'INSERT OR IGNORE INTO candidates (file_id_a, file_id_b, window_id_a, window_id_b) VALUES (?,?,?,?);',
+                    'INSERT OR IGNORE INTO candidates (file_id_a, file_id_b, window_id_a, window_id_b) '
+                    'VALUES (?,?,?,?);',
                     writes)
                 db.commit()
         except sqlite3.DatabaseError:
@@ -914,13 +931,17 @@ def write_candidates(writes, **kwargs):
         for file_id_a in d:
             for file_id_b in d[file_id_a]:
                 out_dir = os.path.join('db', 'candidates', str(file_id_a))
-                make_dir(out_dir)
-                path = os.path.join(out_dir, str(file_id_b))
-                s = ''
-                for row in d[file_id_a][file_id_b]:
-                    s += field_delimiter.join([str(v) for v in row]) + row_delimiter
-                with open(path, 'a') as out:
-                    out.write(s)
+                write_files(d, file_id_a, file_id_b, out_dir)
+
+
+def write_files(d, file_id_a, file_id_b, out_dir):
+    make_dir(out_dir)
+    path = os.path.join(out_dir, str(file_id_b))
+    s = ''
+    for row in d[file_id_a][file_id_b]:
+        s += field_delimiter.join([str(v) for v in row]) + row_delimiter
+    with open(path, 'a') as out:
+        out.write(s)
 
 
 def write_matches(writes, **kwargs):
@@ -928,11 +949,13 @@ def write_matches(writes, **kwargs):
     if kwargs.get('db') == 'sqlite':
         try:
             if writes:
-                if kwargs['verbose']: print(' * writing', len(writes), 'matches')
+                if kwargs['verbose']:
+                    print(' * writing', len(writes), 'matches')
                 with closing(get_db('matches', **kwargs)) as db:
                     cursor = db.cursor()
                     cursor.executemany(
-                        'INSERT INTO matches (file_id_a, file_id_b, window_id_a, window_id_b, similarity) VALUES (?,?,?,?,?);',
+                        'INSERT INTO matches (file_id_a, file_id_b, window_id_a, window_id_b, similarity) '
+                        'VALUES (?,?,?,?,?);',
                         writes)
                     db.commit()
             return []
@@ -947,13 +970,7 @@ def write_matches(writes, **kwargs):
         for file_id_a in d:
             for file_id_b in d[file_id_a]:
                 out_dir = os.path.join('db', 'matches', str(file_id_a))
-                make_dir(out_dir)
-                path = os.path.join(out_dir, str(file_id_b))
-                s = ''
-                for row in d[file_id_a][file_id_b]:
-                    s += field_delimiter.join([str(v) for v in row]) + row_delimiter
-                with open(path, 'a') as out:
-                    out.write(s)
+                write_files(d, file_id_a, file_id_b, out_dir)
 
 
 def delete_matches(banished_dict, **kwargs):
@@ -962,11 +979,13 @@ def delete_matches(banished_dict, **kwargs):
         deletes = []
         for file_id, window_ids in banished_dict.items():
             deletes += [(file_id, i, file_id, i) for i in window_ids]
-        if kwargs['verbose']: print(' * deleting', len(deletes), 'matches')
+        if kwargs['verbose']:
+            print(' * deleting', len(deletes), 'matches')
         with closing(get_db('matches', **kwargs)) as db:
             cursor = db.cursor()
             cursor.executemany(
-                'DELETE FROM matches WHERE file_id_a = (?) AND window_id_a = (?) OR file_id_b = (?) and window_id_b = (?) ',
+                'DELETE FROM matches WHERE file_id_a = (?) AND window_id_a = (?) OR file_id_b = (?) '
+                'and window_id_b = (?) ',
                 deletes)
             db.commit()
     else:
@@ -975,10 +994,10 @@ def delete_matches(banished_dict, **kwargs):
             for i in files:
                 with open(i) as f:
                     lines = []
-                    for l in f.read().strip().split(row_delimiter):
-                        window_id_a, window_id_b, sim = l.split(field_delimiter)
+                    for e in f.read().strip().split(row_delimiter):
+                        window_id_a, window_id_b, sim = e.split(field_delimiter)
                         if window_id_a not in banished_dict[file_id]:
-                            lines.append(l)
+                            lines.append(e)
                 # write the cleaned lines to disk
                 with open(i, 'w') as out:
                     out.write(row_delimiter.join(lines))
@@ -996,7 +1015,8 @@ def repair_database(**kwargs):
 
 def stream_hashbands(**kwargs):
     """Stream [hashband, file_id, window_id] sorted by hashband"""
-    if kwargs.get('verbose'): print(' * querying for hashbands')
+    if kwargs.get('verbose'):
+        print(' * querying for hashbands')
     if kwargs.get('db') == 'sqlite':
         with closing(get_db('hashbands', **kwargs)) as db:
             cursor = db.cursor()
@@ -1019,7 +1039,8 @@ def stream_hashbands(**kwargs):
                 f = f.read()
             # accumulate file_id, window id values by hashband to effectively sort by hashband
             for row in f.split(row_delimiter):
-                if not row: continue
+                if not row:
+                    continue
                 hashband, file_id, window_id = row.split(field_delimiter)
                 d[hashband].append([int(file_id), int(window_id)])
             for hashband in d:
@@ -1031,7 +1052,8 @@ def stream_hashbands(**kwargs):
 
 def stream_candidate_file_id_pairs(**kwargs):
     """Stream [file_id_a, file_id_b] pairs for files with matching hashbands"""
-    if kwargs.get('verbose'): print(' * querying for candidate file id pairs')
+    if kwargs.get('verbose'):
+        print(' * querying for candidate file id pairs')
     if kwargs.get('db') == 'sqlite':
         with closing(get_db('candidates', **kwargs)) as db:
             cursor = db.cursor()
@@ -1051,7 +1073,8 @@ def stream_candidate_file_id_pairs(**kwargs):
 
 def stream_matching_candidate_windows(file_id_a, file_id_b, **kwargs):
     """Stream [file_id_a, file_id_b, window_id_a, window_id_b] for matching hashbands"""
-    if kwargs.get('verbose'): print(' * querying for matching candidate windows')
+    if kwargs.get('verbose'):
+        print(' * querying for matching candidate windows')
     if kwargs.get('db') == 'sqlite':
         with closing(get_db('candidates', **kwargs)) as db:
             cursor = db.cursor()
@@ -1066,7 +1089,8 @@ def stream_matching_candidate_windows(file_id_a, file_id_b, **kwargs):
         with open(os.path.join('db', 'candidates', str(file_id_a), str(file_id_b))) as f:
             f = f.read()
         for row in f.split(row_delimiter):
-            if not row: continue
+            if not row:
+                continue
             yield [int(file_id_a), int(file_id_b)] + [int(i) for i in row.split(field_delimiter)]
 
 
@@ -1097,7 +1121,8 @@ def stream_file_pair_matches(file_id_a, file_id_b, **kwargs):
         with open(os.path.join('db', 'matches', str(file_id_a), str(file_id_b))) as f:
             f = f.read()
             for row in f.split(row_delimiter):
-                if not row: continue
+                if not row:
+                    continue
                 yield [int(file_id_a), int(file_id_b)] + [int(j) for j in row.split(field_delimiter)]
 
 
@@ -1107,7 +1132,7 @@ def stream_match_lists(**kwargs):
         file_id = os.path.basename(i).replace('.json', '')
         with open(i) as f:
             match_list = json.load(f)
-            yield (file_id, match_list)
+            yield file_id, match_list
 
 
 ##
@@ -1117,12 +1142,13 @@ def stream_match_lists(**kwargs):
 
 def banish_matches(**kwargs):
     """Delete banished matches from the db"""
-    if not kwargs['banish_glob']: return
+    if not kwargs['banish_glob']:
+        return
     print(' * banishing matches')
     g = networkx.Graph()
     for file_id_a, file_id_b in stream_matching_file_id_pairs(**kwargs):
-        l = stream_file_pair_matches(file_id_a, file_id_b, **kwargs)
-        for _, _, window_a, window_b, sim in l:
+        pair_matches = stream_file_pair_matches(file_id_a, file_id_b, **kwargs)
+        for _, _, window_a, window_b, sim in pair_matches:
             s = '{}.{}'.format(file_id_a, window_a)
             t = '{}.{}'.format(file_id_b, window_b)
             g.add_edge(s, t)
@@ -1140,19 +1166,19 @@ def banish_matches(**kwargs):
     delete_matches(banished_dict, **kwargs)
 
 
-def to_graph(l):
+def to_graph(it):
     """Given a 2D array, return a networkx.Graph object"""
-    G = networkx.Graph()
+    g = networkx.Graph()
     # i is a list of nodes that share edges
-    for i in l:
-        G.add_nodes_from(i)
-        G.add_edges_from(to_edges(i))
-    return G
+    for i in it:
+        g.add_nodes_from(i)
+        g.add_edges_from(to_edges(i))
+    return g
 
 
-def to_edges(l):
+def to_edges(it):
     """Given a list of elements that share edges in a graph, iterate those edges pairwise"""
-    iterator = iter(l)
+    iterator = iter(it)
     last = next(iterator)
     for current in iterator:
         yield last, current
@@ -1162,6 +1188,8 @@ def to_edges(l):
 ##
 # Shared
 ##
+
+NEWLINE = '__NEWLINE__'
 
 
 @functools.lru_cache(maxsize=1024)
@@ -1178,13 +1206,13 @@ def get_words(path, **kwargs):
         f = unidecode(f)
     # optionally format the list of words for display in the web viewer
     if kwargs.get('display', False):
-        NEWLINE = '__NEWLINE__'
-        l = f.replace('\n', ' ' + NEWLINE + ' ').split()
+        lines = f.replace('\n', ' ' + NEWLINE + ' ').split()
         formatted = []
-        for idx, i in enumerate(l):
+        for idx, i in enumerate(lines):
             if i == NEWLINE:
                 # prevent more than two consecutive brs
-                if formatted and not formatted[-1].endswith('<br/><br/>'): formatted[-1] += '<br/>'
+                if formatted and not formatted[-1].endswith('<br/><br/>'):
+                    formatted[-1] += '<br/>'
             else:
                 formatted.append(i)
         return formatted
@@ -1194,7 +1222,7 @@ def get_words(path, **kwargs):
 
 def get_file_handler(path, **kwargs):
     """Given the path to a file return a _io.TextIOWrapper object in 'r' mode"""
-    return codecs.open(path, 'r', kwargs['encoding'])
+    return open(path, encoding=kwargs['encoding'])
 
 
 def get_soup(f, **kwargs):
@@ -1215,12 +1243,12 @@ def get_soup(f, **kwargs):
 def get_windows(path, **kwargs):
     """Given a file path return a list of strings from that file"""
     words = get_words(path, **kwargs)
-    l = []
+    buff = []
     for idx, window in enumerate(list(ngrams(words, kwargs['window_length']))):
         if idx % kwargs['slide_length'] != 0:
             continue
-        l.append(' '.join(window))
-    return l
+        buff.append(' '.join(window))
+    return buff
 
 
 @functools.lru_cache(maxsize=1024)
@@ -1228,7 +1256,8 @@ def get_window_map(path, **kwargs):
     """Get a mapping from window id to window metadata, including page id"""
     xml_page_tag = kwargs.get('xml_page_tag')
     xml_page_attr = kwargs.get('xml_page_attr')
-    if not xml_page_tag: return
+    if not xml_page_tag:
+        return
     xml_page_tag = xml_page_tag.lower()
     xml_page_attr = xml_page_attr.lower() if xml_page_attr else None
     # read the text document
@@ -1253,7 +1282,8 @@ def get_window_map(path, **kwargs):
         # hande case of page id between tags
         elif '</' + xml_page_tag in page:
             page_id = page.split('</' + xml_page_tag)[0]
-            if '>' in page_id: page_id = page_id.split('>')[1]
+            if '>' in page_id:
+                page_id = page_id.split('>')[1]
         # handle case of sequential pages without identification (self-closing tags)
         else:
             page_id = page_index
@@ -1282,7 +1312,8 @@ def get_cacheable(*args):
 
 def get_word_counts(**kwargs):
     """Return a bounter.bounter instance if user requested string likelihoods, else None"""
-    if not kwargs.get('compute_probabilities'): return None
+    if not kwargs.get('compute_probabilities'):
+        return None
     print(' * computing word counts')
     counts = bounter(size_mb=int(kwargs.get('bounter_size')))
     for i in kwargs['infiles']:
@@ -1292,14 +1323,15 @@ def get_word_counts(**kwargs):
     return counts
 
 
-def get_string_sim(a, b, **kwargs):
+def get_string_sim(a, b, **_):
     """Return the similarity between strings a and b"""
-    return SequenceMatcher(None, a, b, autojunk=False).ratio() * 100
+    return SequenceMatcher(a=a, b=b, autojunk=False).ratio() * 100
 
 
 def get_string_prob(a, b, counts):
     """Return the maximum probability of s1 and s2 as a float"""
-    if not counts: return -1
+    if not counts:
+        return -1
     probs_a = sum([counts[w] / counts.total() for w in a.split()])
     probs_b = sum([counts[w] / counts.total() for w in b.split()])
     return round(max([probs_a, probs_b]), 3) * 1000
