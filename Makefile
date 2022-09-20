@@ -38,7 +38,7 @@ install: build
 .PHONY: install
 
 run_sample: install
-	./venv/bin/poetry run python src/intertext/intertext.py --infiles "sample_data/texts/*.txt" --metadata "sample_data/metadata.json"
+	./venv/bin/poetry run python src/intertext/intertext_main.py --infiles "sample_data/texts/*.txt" --metadata "sample_data/metadata.json"
 	./venv/bin/poetry run python -m http.server 8000 --directory output
 .PHONY: run_sample
 

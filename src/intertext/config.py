@@ -19,6 +19,7 @@ except:
 source_location = os.path.dirname(os.path.realpath(__file__))
 client_location = os.path.join(source_location, 'client')
 cache_location = os.path.join(os.getcwd(), 'cache')
+hasher = VectorizedMinHash(n_perm=256)
 row_delimiter = '\n'
 field_delimiter = '-'
 
@@ -273,6 +274,3 @@ def write_config(**kwargs):
             'window_size': kwargs['window_length'],
             'window_slide': kwargs['slide_length'],
         }, out)
-
-
-hasher = VectorizedMinHash(n_perm=256)
