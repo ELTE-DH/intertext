@@ -1,19 +1,18 @@
-import glob
-import os
 import shutil
 import sqlite3
-from collections import defaultdict
+from pathlib import Path
 from contextlib import closing
+from collections import defaultdict
 
 from config import cache_location, row_delimiter, field_delimiter
 
 
 def clear_db(**_):
     """Clear the extant db"""
-    if os.path.isdir('db'):
+    if Path('db').exists():
         shutil.rmtree('db')
-    for i in glob.glob(os.path.join('cache', '*.db')):
-        os.remove(i)
+    for i in Path('cache').glob('*.db'):
+        i.unlink()
 
 
 def initialize_db(db_name, **kwargs):
@@ -32,21 +31,19 @@ def initialize_db(db_name, **kwargs):
                 'CREATE TABLE matches (file_id_a INTEGER, file_id_b INTEGER, window_id_a INTEGER, window_id_b '
                 'INTEGER, similarity INTEGER);')
     else:
-        for i in ['hashbands', 'candidates', 'matches']:
-            path = os.path.join('db', i)
-            if not os.path.exists(path):
-                os.makedirs(path)
+        for i in ('hashbands', 'candidates', 'matches'):
+            (Path('db') / i).mkdir(parents=True, exist_ok=True)
 
 
 def get_db(db_name, initialize=False, **_):
     """Return a Sqlite DB"""
-    db_location = os.path.join(cache_location, '{}.db'.format(db_name))
+    db_location = cache_location / f'{db_name}.db'
     db = sqlite3.connect(db_location, uri=True, timeout=2 ** 16)
     if initialize:
         db.execute('PRAGMA synchronous = EXTRA;')  # OFF is fastest
         db.execute('PRAGMA journal_mode = DELETE;')  # WAL is fastest
     db.execute('PRAGMA temp_store = 1;')
-    db.execute('PRAGMA temp_store_directory = "{}"'.format(cache_location))
+    db.execute(f'PRAGMA temp_store_directory = "{cache_location}"')
     return db
 
 
@@ -70,13 +67,9 @@ def write_hashbands(writes, **kwargs):
         for hashband, file_id, window_id in writes:
             d[hashband].append([file_id, window_id])
         for hashband in d:
-            out_dir = os.path.join('db', 'hashbands', hashband[0:2])
-            if not os.path.exists(out_dir):
-                try:
-                    os.makedirs(out_dir)
-                except:
-                    pass
-            path = os.path.join(out_dir, hashband[2:4])
+            out_dir = Path('db') / 'hashbands' / hashband[0:2]
+            out_dir.mkdir(parents=True, exist_ok=True)
+            path = out_dir / hashband[2:4]
             with open(path, 'a') as out:
                 s = ''
                 for r in d[hashband]:
@@ -109,22 +102,16 @@ def write_candidates(writes, **kwargs):
             d[file_id_a][file_id_b].append([window_id_a, window_id_b])
         for file_id_a in d:
             for file_id_b in d[file_id_a]:
-                out_dir = os.path.join('db', 'candidates', str(file_id_a))
+                out_dir = Path('db') / 'candidates' / str(file_id_a)
                 write_files(d, file_id_a, file_id_b, out_dir)
 
 
 def write_files(d, file_id_a, file_id_b, out_dir):
-    if not os.path.exists(out_dir):
-        try:
-            os.makedirs(out_dir)
-        except:
-            pass
-    path = os.path.join(out_dir, str(file_id_b))
-    s = ''
-    for row in d[file_id_a][file_id_b]:
-        s += field_delimiter.join([str(v) for v in row]) + row_delimiter
-    with open(path, 'a') as out:
-        out.write(s)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with open(out_dir / str(file_id_b), 'a') as out:
+        for row in d[file_id_a][file_id_b]:
+            out.write(field_delimiter.join(str(v) for v in row))
+            out.write(row_delimiter)
 
 
 def write_matches(writes, **kwargs):
@@ -152,8 +139,7 @@ def write_matches(writes, **kwargs):
             d[file_id_a][file_id_b].append([window_id_a, window_id_b, sim])
         for file_id_a in d:
             for file_id_b in d[file_id_a]:
-                out_dir = os.path.join('db', 'matches', str(file_id_a))
-                write_files(d, file_id_a, file_id_b, out_dir)
+                write_files(d, file_id_a, file_id_b, Path('db') / 'matches' / str(file_id_a))
 
 
 def delete_matches(banished_dict, **kwargs):
@@ -173,8 +159,7 @@ def delete_matches(banished_dict, **kwargs):
             db.commit()
     else:
         for file_id in banished_dict:
-            files = glob.glob(os.path.join('db', 'matches', file_id, '*'))
-            for i in files:
+            for i in (Path('db') / 'matches' / file_id).glob('*'):
                 with open(i) as f:
                     lines = []
                     for e in f.read().strip().split(row_delimiter):
@@ -186,7 +171,7 @@ def delete_matches(banished_dict, **kwargs):
                     out.write(row_delimiter.join(lines))
 
 
-def repair_database(**kwargs):
+def repair_database(**_):
     """Attempt to repair the db in a process-safe manner"""
     raise sqlite3.DatabaseError
 
@@ -211,7 +196,7 @@ def stream_hashbands(**kwargs):
       """):
                 yield row
     else:
-        for i in glob.glob(os.path.join('db', 'hashbands', '*', '*')):
+        for i in (Path('db') / 'hashbands').glob('*/*'):
             d = defaultdict(list)
             with open(i) as f:
                 f = f.read()
@@ -242,10 +227,25 @@ def stream_candidate_file_id_pairs(**kwargs):
       """):
                 yield row
     else:
-        for i in glob.glob(os.path.join('db', 'candidates', '*')):
-            file_id_a = os.path.split(i)[-1]
-            for j in glob.glob(os.path.join(i, '*')):
-                file_id_b = os.path.split(j)[-1]
+        for i in (Path('db') / 'candidates').glob('*'):
+            file_id_a = i.name
+            for j in i.glob('*'):
+                file_id_b = j.name
+                yield [int(file_id_a), int(file_id_b)]
+
+
+def stream_matching_file_id_pairs(**kwargs):
+    """Stream [file_id_a, file_id_b] for file ids that have verified matches"""
+    if kwargs.get('db') == 'sqlite':
+        with closing(get_db('matches', **kwargs)) as db:
+            cursor = db.cursor()
+            for i in cursor.execute('SELECT DISTINCT file_id_a, file_id_b FROM matches;'):
+                yield i
+    else:
+        for i in (Path('db') / 'matches').glob('*'):
+            file_id_a = i.name
+            for j in i.glob('*'):
+                file_id_b = j.name
                 yield [int(file_id_a), int(file_id_b)]
 
 
@@ -264,27 +264,12 @@ def stream_matching_candidate_windows(file_id_a, file_id_b, **kwargs):
         """, (file_id_a, file_id_b,)):
                 yield i
     else:
-        with open(os.path.join('db', 'candidates', str(file_id_a), str(file_id_b))) as f:
+        with open(Path('db') / 'candidates' / str(file_id_a) / str(file_id_b)) as f:
             f = f.read()
         for row in f.split(row_delimiter):
             if not row:
                 continue
             yield [int(file_id_a), int(file_id_b)] + [int(i) for i in row.split(field_delimiter)]
-
-
-def stream_matching_file_id_pairs(**kwargs):
-    """Stream [file_id_a, file_id_b] for file ids that have verified matches"""
-    if kwargs.get('db') == 'sqlite':
-        with closing(get_db('matches', **kwargs)) as db:
-            cursor = db.cursor()
-            for i in cursor.execute('SELECT DISTINCT file_id_a, file_id_b FROM matches;'):
-                yield i
-    else:
-        for i in glob.glob(os.path.join('db', 'matches', '*')):
-            file_id_a = os.path.split(i)[-1]
-            for j in glob.glob(os.path.join(i, '*')):
-                file_id_b = os.path.split(j)[-1]
-                yield [int(file_id_a), int(file_id_b)]
 
 
 def stream_file_pair_matches(file_id_a, file_id_b, **kwargs):
@@ -296,7 +281,7 @@ def stream_file_pair_matches(file_id_a, file_id_b, **kwargs):
                                     (file_id_a, file_id_b,)):
                 yield i
     else:
-        with open(os.path.join('db', 'matches', str(file_id_a), str(file_id_b))) as f:
+        with open(Path('db') / 'matches' / str(file_id_a) / str(file_id_b)) as f:
             f = f.read()
             for row in f.split(row_delimiter):
                 if not row:

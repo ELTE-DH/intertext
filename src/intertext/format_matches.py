@@ -1,11 +1,12 @@
 import functools
 import json
 import multiprocessing
-import os
 import uuid
-from collections import defaultdict
+from pathlib import Path
 from copy import deepcopy
+from collections import defaultdict
 from difflib import SequenceMatcher
+
 
 from bounter import bounter
 
@@ -41,7 +42,7 @@ def format_file_matches(counts, file_args, **kwargs):
     if kwargs['max_file_sim']:
         if (len(pair_matches) > len(a_windows) * kwargs['max_file_sim']) or \
                 (len(pair_matches) > len(b_windows) * kwargs['max_file_sim']):
-            print(' * file pair', *args, 'has >= max_file_sim; skipping!')
+            print(' * file pair', *file_args, 'has >= max_file_sim; skipping!')
             return []
     # cluster the matches so sequential matching windows are grouped into a single match
     clusters = []
@@ -69,19 +70,19 @@ def format_file_matches(counts, file_args, **kwargs):
                 })
     # format the matches, then save into both file_id_a and file_id_b directories
     formatted = format_matches(file_id_a, file_id_b, clusters, counts, **kwargs)
-    for i in [file_id_a, file_id_b]:
-        out_dir = os.path.join(kwargs['output'], 'api', 'matches', str(i))
-        with open(os.path.join(out_dir, f'{file_id_a}-{file_id_b}.json'), 'w') as out:
+    for i in (file_id_a, file_id_b):
+        out_dir = kwargs['output'] / 'api' / 'matches' / str(i)
+        with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w') as out:
             json.dump(formatted, out)
 
 
 def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
     """Given integer file ids and clusters [{a: [], b: [], sim: []}] format matches for display"""
     file_id_a, file_id_b, clusters = order_match_pair(file_id_a, file_id_b, clusters, **kwargs)
-    path_a = kwargs['infiles'][file_id_a]
-    path_b = kwargs['infiles'][file_id_b]
-    bn_a = os.path.basename(path_a)
-    bn_b = os.path.basename(path_b)
+    path_a = Path(kwargs['infiles'][file_id_a])
+    path_b = Path(kwargs['infiles'][file_id_b])
+    bn_a = path_a.name
+    bn_b = path_b.name
     a_meta = kwargs.get('metadata', {}).get(bn_a, {})
     b_meta = kwargs.get('metadata', {}).get(bn_b, {})
     # format the matches
@@ -139,8 +140,8 @@ def get_url(meta, windows_to_page, windows, **kwargs):
 
 def order_match_pair(file_id_a, file_id_b, clusters, **kwargs):
     """Set file id a to the previously published file (if relevant)"""
-    a_meta = kwargs.get('metadata', {}).get(os.path.basename(kwargs['infiles'][file_id_a]), {})
-    b_meta = kwargs.get('metadata', {}).get(os.path.basename(kwargs['infiles'][file_id_b]), {})
+    a_meta = kwargs.get('metadata', {}).get(Path(kwargs['infiles'][file_id_a]).name, {})
+    b_meta = kwargs.get('metadata', {}).get(Path(kwargs['infiles'][file_id_b]).name, {})
     if a_meta and \
             b_meta and \
             a_meta.get('year') and \

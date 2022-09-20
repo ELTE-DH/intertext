@@ -1,5 +1,5 @@
-import functools
 import random
+import functools
 from typing import Hashable
 
 from bs4 import BeautifulSoup

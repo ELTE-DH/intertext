@@ -1,5 +1,5 @@
-import os
 import json
+from pathlib import Path
 from collections import defaultdict
 
 import networkx
@@ -86,9 +86,8 @@ def process_texts(**kwargs):
 def create_reader_data(**kwargs):
     """Create the data to be used in the reader view"""
     for idx, i in enumerate(kwargs['infiles']):
-        out_path = os.path.join(kwargs['output'], 'api', 'texts', str(idx) + '.json')
         words = get_words(i, **get_cacheable(kwargs, {'display': True}))
-        with open(out_path, 'w') as out:
+        with open(Path(kwargs['output']) / 'api' / 'texts' / f'{idx}.json', 'w') as out:
             json.dump(words, out)
 
 ##

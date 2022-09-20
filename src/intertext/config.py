@@ -1,9 +1,9 @@
 import argparse
 import glob
 import json
-import os
 import shutil
 import zipfile
+from pathlib import Path
 
 import requests
 from vectorizedMinHash import VectorizedMinHash
@@ -16,10 +16,10 @@ except:
     CUDA_AVAILABLE = False
 
 
-source_location = os.path.dirname(os.path.realpath(__file__))
-client_location = os.path.join(source_location, 'client')
-cache_location = os.path.join(os.getcwd(), 'cache')
 hasher = VectorizedMinHash(n_perm=256)
+source_location = Path(__file__).parent
+client_location = source_location / 'client'
+cache_location = Path('.') / 'cache'
 row_delimiter = '\n'
 field_delimiter = '-'
 
@@ -27,7 +27,7 @@ config = {
     'infile_glob': '',
     'banish_glob': '',
     'exclude_glob': '',
-    'output': 'output',
+    'output': Path('output'),
     'metadata': {},
     'encoding': 'utf8',
     'xml_base_tag': None,
@@ -61,15 +61,15 @@ config = {
 # This is the module's main function (CLI)
 def parse():
     """Parse the command line arguments and initialize text processing"""
-    description = 'Discover and visualize text reuse'
-    parser = argparse.ArgumentParser(description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description='Discover and visualize text reuse',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--infiles', '-i', type=str, default=config['infile_glob'], dest='infile_glob',
                         help='path to a glob of text files to process', required=False)
     parser.add_argument('--banish', '-b', type=str, default=config['banish_glob'], dest='banish_glob',
                         help='path to a glob of text files to banish from matches', required=False)
     parser.add_argument('--exclude', type=str, default=config['exclude_glob'], dest='exclude_glob',
                         help='path to a glob of text files to exclude from matches', required=False)
-    parser.add_argument('--metadata', '-m', type=str, default=config['metadata'],
+    parser.add_argument('--metadata', '-m', type=Path, default=config['metadata'],
                         help='path to a JSON metadata file (see README)', required=False)
     parser.add_argument('--encoding', '-e', type=str, default=config['encoding'], help='the encoding of infiles',
                         required=False)
@@ -91,7 +91,7 @@ def parse():
                         help='the minimum similarity of matches to retain)', required=False)
     parser.add_argument('--max_file_sim', '-fs', type=int, default=config['max_file_sim'],
                         help='the maximum similarity between two files such that matches are retained', required=False)
-    parser.add_argument('--output', '-o', type=str, default=config['output'], help='the output location',
+    parser.add_argument('--output', '-o', type=Path, default=config['output'], help='the output location',
                         required=False)
     parser.add_argument('--client', '-c', type=str, default=config['client'],
                         help='the client version to fetch and display', required=False)
@@ -134,16 +134,16 @@ def parse():
 def remove_client(**_):
     """Remove the cached client so it will be fetched afresh"""
     print(' * clearing cached client')
-    if os.path.exists(os.path.join(source_location, 'client')):
+    if (source_location / 'client').exists():
         shutil.rmtree(client_location)
 
 
 def download_client(**kwargs):
     """Download the client to the cache (if necessary) and copy to the output directory"""
-    if not os.path.exists(client_location):
+    if not client_location.exists():
         print(f' * fetching client version {kwargs["client"]}')
-        os.makedirs(client_location)
-        zip_location = os.path.join(client_location, 'client.zip')
+        client_location.mkdir(parents=True)
+        zip_location = client_location / 'client.zip'
         # download the zip archive
         with open(zip_location, 'wb') as out:
             url = f'https://lab-apps.s3-us-west-2.amazonaws.com/intertext-builds/intertext-client-' \
@@ -154,14 +154,14 @@ def download_client(**kwargs):
             z.extractall(client_location)
         # remove extant matches if user provided inputs
         if kwargs.get('infile_glob'):
-            former_api_location = os.path.join(client_location, 'build', 'api')
-            if os.path.exists(former_api_location):
+            former_api_location = client_location / 'build' / 'api'
+            if former_api_location.exists():
                 shutil.rmtree(former_api_location)
     # copy the `build` directory to the output directory
-    if os.path.exists(kwargs['output']):
+    if kwargs['output'].exists():
         shutil.rmtree(kwargs['output'])
     # copy the web client
-    shutil.copytree(os.path.join(client_location, 'build'), kwargs['output'])
+    shutil.copytree(client_location / 'build', kwargs['output'])
 
 
 def process_kwargs(**kwargs):
@@ -214,7 +214,7 @@ def get_metadata(**kwargs):
     """if the user provided metadata, store it in the kwargs"""
     metadata = json.load(open(kwargs['metadata'])) if kwargs['metadata'] else {}
     for i in kwargs['infiles']:
-        basename = os.path.basename(i)
+        basename = Path(i).name
         if basename not in metadata:
             metadata[basename] = {}
         if not metadata[basename].get('author'):
@@ -237,20 +237,14 @@ def get_only_index(**kwargs):
 
 def prepare_output_directories(**kwargs):
     """Create the folders that store output objects"""
-    for i in ['matches', 'scatterplots', 'indices', 'texts']:
-        path = os.path.join(kwargs['output'], 'api', i)
-        if not os.path.exists(path):
-            os.makedirs(path)
+    for i in ('matches', 'scatterplots', 'indices', 'texts'):
+        (kwargs['output'] / 'api' / i).mkdir(parents=True, exist_ok=True)
 
-    for i in ['minhashes']:
-        path = os.path.join(cache_location, i)
-        if not os.path.exists(path):
-            os.makedirs(path)
+    for i in ('minhashes',):
+        (cache_location / i).mkdir(parents=True, exist_ok=True)
 
     for i in range(len(kwargs['infiles'])):
-        path = os.path.join(kwargs['output'], 'api', 'matches', str(i))
-        if not os.path.exists(path):
-            os.makedirs(path)
+        (kwargs['output'] / 'api' / 'matches' / str(i)).mkdir(parents=True, exist_ok=True)
 
 
 def write_config(**kwargs):
@@ -259,15 +253,14 @@ def write_config(**kwargs):
     for idx, i in enumerate(kwargs['infiles']):
         if i in kwargs.get('excluded_file_ids', []) or i in kwargs.get('banished_file_ids', []):
             continue
-        file_meta = kwargs['metadata'].get(os.path.basename(i), {})
+        file_meta = kwargs['metadata'].get(Path(i).name, {})
         metadata.append({
             'id': idx,
             'author': file_meta['author'],
             'title': file_meta['title'],
-            'matches': os.path.getsize(os.path.join(kwargs['output'], 'api', 'matches', str(idx) + '.json')) > 2,
+            'matches': (kwargs['output'] / 'api' / 'matches' / f'{idx}.json').stat().st_size > 2,
         })
-    out_path = os.path.join(kwargs['output'], 'api', 'config.json')
-    with open(out_path, 'w') as out:
+    with open(kwargs['output'] / 'api' / 'config.json', 'w') as out:
         json.dump({
             'infiles': kwargs['infiles'],
             'metadata': metadata,

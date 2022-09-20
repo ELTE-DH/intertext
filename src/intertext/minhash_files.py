@@ -1,6 +1,5 @@
 import functools
 import multiprocessing
-import os
 
 import numpy as np
 from nltk import ngrams
@@ -37,8 +36,8 @@ def get_file_hashbands(args, **kwargs):
 
 def get_file_minhashes(file_path, **kwargs):
     """Return the minhash array for a file"""
-    minhash_path = os.path.join(cache_location, 'minhashes', file_path.replace(os.path.sep, '___') + '.npy')
-    if os.path.exists(minhash_path):
+    minhash_path = cache_location / 'minhashes' / (str(file_path).replace('/', '___') + '.npy')
+    if minhash_path.exists():
         print(' * loading', file_path, 'minhashes from cache')
         return np.load(minhash_path)
     # run minhash algorithm on file

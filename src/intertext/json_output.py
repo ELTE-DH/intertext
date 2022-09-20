@@ -1,7 +1,6 @@
-import glob
 import json
-import os
 import shutil
+from pathlib import Path
 from collections import defaultdict
 
 
@@ -9,15 +8,15 @@ def create_all_match_json(**kwargs):
     """Create the output JSON to be consumed by the web client"""
     # combine all the matches in each match directory into a composite match file
     guid_to_int = defaultdict(lambda: len(guid_to_int))
-    for match_directory in glob.glob(os.path.join(kwargs['output'], 'api', 'matches', '*')):
+    for match_directory in (kwargs['output'] / 'api' / 'matches').glob('*'):
         # buff contains the flat list of matches for a single input file
         buff = []
-        for j in glob.glob(os.path.join(match_directory, '*')):
+        for j in match_directory.glob('*'):
             with open(j) as f:
                 buff += json.load(f)
         for i in buff:
             i['_id'] = guid_to_int[i['_id']]
-        with open(os.path.join(match_directory + '.json'), 'w') as out:
+        with open(f'{match_directory}.json', 'w') as out:
             json.dump(buff, out)
         shutil.rmtree(match_directory)
 
@@ -59,7 +58,7 @@ def create_all_match_json(**kwargs):
         inverse = label in {'similarity', 'length', 'probability'}
         sorted_list = sorted(buff, key=lambda x: x[idx], reverse=inverse)
         ids = [[int(k) if is_number(k) else k for k in i[:6]] for i in sorted_list]
-        with open(os.path.join(kwargs['output'], 'api', 'indices', 'match-ids-by-{}.json'.format(label)), 'w') as out:
+        with open(kwargs['output'] / 'api' / 'indices' / 'match-ids-by-{label}.json', 'w') as out:
             json.dump(ids, out)
 
     # create the scatterplot data
@@ -68,16 +67,16 @@ def create_all_match_json(**kwargs):
 
 def write_scatterplots(**kwargs):
     """Write the scatterplot JSON"""
-    out_dir = os.path.join(kwargs['output'], 'api', 'scatterplots')
-    for i in ['source', 'target']:
-        for j in ['segment_ids', 'file_id', 'author']:
-            for k in ['sum', 'mean']:
+    out_dir = kwargs['output'] / 'api' / 'scatterplots'
+    for i in ('source', 'target'):
+        for j in ('segment_ids', 'file_id', 'author'):
+            for k in ('sum', 'mean'):
                 data_nest = defaultdict(list)
                 for file_id, matches in stream_match_lists(**kwargs):
                     for match in matches:
                         if j == 'segment_ids':
                             level = i + '.' + str(match[i + '_file_id']) + '.'
-                            level += '.'.join([str(m) for m in match[i + '_segment_ids']])
+                            level += '.'.join(str(m) for m in match[i + '_segment_ids'])
                         else:
                             level = match[i + '_' + j]
                         # ensure the level (aka data key) is a string
@@ -103,14 +102,14 @@ def write_scatterplots(**kwargs):
                         'target_year': o['target_year'],
                     })
                 # write the scatterplot data
-                with open(os.path.join(out_dir, '{}-{}-{}.json'.format(i, j, k)), 'w') as out:
+                with open(Path(out_dir) / f'{i}-{j}-{k}.json', 'w') as out:
                     json.dump(scatterplot_data, out)
 
 
 def stream_match_lists(**kwargs):
     """Stream a stream of (file_id, [match, match, ...]) objects"""
-    for i in glob.glob(os.path.join(kwargs['output'], 'api', 'matches', '*')):
-        file_id = os.path.basename(i).replace('.json', '')
+    for i in (kwargs['output'] / 'api' / 'matches').glob('*'):
+        file_id = i.stem
         with open(i) as f:
             match_list = json.load(f)
             yield file_id, match_list
