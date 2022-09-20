@@ -1,20 +1,13 @@
-import functools
-import multiprocessing
+from difflib import SequenceMatcher
 
-from utils import get_windows, get_cacheable
-from format_matches import get_string_sim
+from utils import get_windows, get_cacheable, parallel_map
 from db import write_matches, stream_candidate_file_id_pairs, stream_matching_candidate_windows
 
 
 def validate_all_matches(kwargs):
     """Run match validations and yield [a_file,b_file,a_window,b_window]"""
-    pool = multiprocessing.Pool()
     pairs = stream_candidate_file_id_pairs(kwargs)
-    f = functools.partial(validate_file_matches, **kwargs)
-    for _ in pool.map(f, pairs):
-        pass
-    pool.close()
-    pool.join()
+    parallel_map(validate_file_matches, pairs, kwargs)
 
 
 def validate_file_matches(file_args, **kwargs):
@@ -33,7 +26,7 @@ def validate_file_matches(file_args, **kwargs):
             print(file_id_a, window_id_a, len(file_a_windows), kwargs['infiles'][file_id_a])
             print(file_id_b, window_id_b, len(file_b_windows), kwargs['infiles'][file_id_b])
             continue
-        sim = get_string_sim(text_a, text_b, **kwargs)
+        sim = SequenceMatcher(a=text_a, b=text_b, autojunk=False).ratio() * 100
         if sim >= kwargs['min_sim']:
             # remove matches with predominance of single character words
             a_singles = [i for i in text_a.split() if len(i) == 1]

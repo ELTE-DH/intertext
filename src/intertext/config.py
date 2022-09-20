@@ -1,7 +1,7 @@
-import argparse
 import glob
 import json
 import shutil
+import argparse
 from pathlib import Path
 
 from vectorizedMinHash import VectorizedMinHash
@@ -115,6 +115,7 @@ def parse():
     parser.add_argument('--bounter_size', default=config['bounter_size'], help='MB allocated to bounter instance',
                         required=False)
     config.update(vars(parser.parse_args()))
+    config['cuda_available'] = CUDA_AVAILABLE
     if config.get('xml_remove_tags'):
         config['xml_remove_tags'] = tuple(config['xml_remove_tags'])
     copy_client(client_location, config['output'])

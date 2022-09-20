@@ -1,12 +1,10 @@
-import functools
 import json
-import multiprocessing
-import uuid
+from uuid import uuid4
 from pathlib import Path
 from copy import deepcopy
+from functools import partial
+from multiprocessing import Pool
 from collections import defaultdict
-from difflib import SequenceMatcher
-
 
 from bounter import bounter
 
@@ -14,17 +12,21 @@ from utils import get_words, get_windows, get_window_map, get_cacheable
 from db import stream_matching_file_id_pairs, stream_file_pair_matches
 
 
+# Only this function is public in this file!
 def format_all_matches(kwargs):
     """Format the match objects for each infile and store as JSON"""
-    pool = multiprocessing.Pool()
     pairs = stream_matching_file_id_pairs(kwargs)
     # obtain global counts of terms across corpus
-    counts = get_word_counts(kwargs)
-    f = functools.partial(format_file_matches, counts, **kwargs)
-    for _ in pool.map(f, pairs):
+    parallel_map(format_file_matches, get_word_counts(kwargs), pairs, kwargs)
+
+
+def parallel_map(fun, counts, buff, kwargs):
+    process_pool = Pool()
+    f = partial(fun, counts, **kwargs)
+    for _ in process_pool.map(f, buff):
         pass
-    pool.close()
-    pool.join()
+    process_pool.close()
+    process_pool.join()
 
 
 def format_file_matches(counts, file_args, **kwargs):
@@ -102,7 +104,7 @@ def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
         a_strings = get_match_strings(a_words, c['a'], **get_cacheable(kwargs))
         b_strings = get_match_strings(b_words, c['b'], **get_cacheable(kwargs))
         formatted.append({
-            '_id': str(uuid.uuid4()),
+            '_id': str(uuid4()),
             'similarity': c['sim'],
             'probability': get_string_prob(a_strings['match'], b_strings['match'], counts),
             'source_file_id': int(file_id_a),
@@ -194,15 +196,10 @@ def get_word_counts(kwargs):
     return counts
 
 
-def get_string_sim(a, b, **_):
-    """Return the similarity between strings a and b"""
-    return SequenceMatcher(a=a, b=b, autojunk=False).ratio() * 100
-
-
 def get_string_prob(a, b, counts):
     """Return the maximum probability of s1 and s2 as a float"""
     if not counts:
         return -1
-    probs_a = sum([counts[w] / counts.total() for w in a.split()])
-    probs_b = sum([counts[w] / counts.total() for w in b.split()])
-    return round(max([probs_a, probs_b]), 3) * 1000
+    probs_a = sum(counts[w] / counts.total() for w in a.split())
+    probs_b = sum(counts[w] / counts.total() for w in b.split())
+    return round(max(probs_a, probs_b), 3) * 1000

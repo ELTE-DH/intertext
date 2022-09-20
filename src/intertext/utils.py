@@ -1,21 +1,20 @@
 from random import randint
 from typing import Hashable
-from functools import lru_cache
-from itertools import islice, tee
+from multiprocessing import Pool
+from itertools import islice, tee, chain
+from functools import lru_cache, partial
+
 
 from bs4 import BeautifulSoup
 from unidecode import unidecode
-
-NEWLINE = '__NEWLINE__'
 
 
 @lru_cache(maxsize=1024)
 def get_words(path, **kwargs):
     """Given a file path return a list of strings from that file"""
-    with get_file_handler(path, **kwargs) as f:
+    with open(path, encoding=kwargs['encoding']) as f:
         if kwargs['xml_base_tag']:
-            soup = get_soup(f, **kwargs)
-            f = soup.get_text() if soup else ''
+            f = get_soup_text(f, **kwargs)
         else:
             f = f.read()
     # optionally remove diacritics
@@ -23,10 +22,10 @@ def get_words(path, **kwargs):
         f = unidecode(f)
     # optionally format the list of words for display in the web viewer
     if kwargs.get('display', False):
-        lines = f.replace('\n', ' ' + NEWLINE + ' ').split()
+        lines = f.replace('\n', ' __NEWLINE__ ').split()
         formatted = []
         for idx, i in enumerate(lines):
-            if i == NEWLINE:
+            if i == '__NEWLINE__':
                 # prevent more than two consecutive brs
                 if formatted and not formatted[-1].endswith('<br/><br/>'):
                     formatted[-1] += '<br/>'
@@ -37,27 +36,33 @@ def get_words(path, **kwargs):
         return f.split()
 
 
-def get_file_handler(path, **kwargs):
-    """Given the path to a file return a _io.TextIOWrapper object in 'r' mode"""
-    return open(path, encoding=kwargs['encoding'])
-
-
-def get_soup(f, **kwargs):
+def get_soup_text(f, **kwargs):
     """Return a soup object given a _io.TextIOWrapper object"""
     soup = BeautifulSoup(f, 'html.parser').find(kwargs['xml_base_tag'].lower())
     if not soup:
         print('WARNING: No XML content was found at tag', kwargs['xml_base_tag'].lower(), f.name)
         return ''
     # remove any specified xml tags
-    if kwargs.get('xml_remove_tags'):
-        for i in kwargs['xml_remove_tags']:
-            for t in soup.find_all(i.lower()):
-                t.extract()
-    return soup
+    for i in kwargs.get('xml_remove_tags', []):
+        for t in soup.find_all(i.lower()):
+            t.extract()
+
+    return soup.get_text() if soup else ''
 
 
 def ngrams(it, n):
     return zip(*(islice(it, i, None) for i, it in enumerate(tee(it, n))))
+
+
+def chunked_iterator(iterable, n):
+    # Original source:
+    # https://stackoverflow.com/questions/8991506/iterate-an-iterator-by-chunks-of-n-in-python/29524877#29524877
+    it = iter(iterable)
+    try:
+        while True:
+            yield chain((next(it),), islice(it, n-1))
+    except StopIteration:
+        return
 
 
 @lru_cache(maxsize=1024)
@@ -66,9 +71,8 @@ def get_windows(path, **kwargs):
     words = get_words(path, **kwargs)
     buff = []
     for idx, window in enumerate(ngrams(words, kwargs['window_length'])):
-        if idx % kwargs['slide_length'] != 0:
-            continue
-        buff.append(' '.join(window))
+        if idx % kwargs['slide_length'] == 0:
+            buff.append(' '.join(window))
     return buff
 
 
@@ -82,12 +86,12 @@ def get_window_map(path, **kwargs):
     xml_page_tag = xml_page_tag.lower()
     xml_page_attr = xml_page_attr.lower() if xml_page_attr else None
     # read the text document
-    with get_file_handler(path, **kwargs) as f:
+    with open(path, encoding=kwargs['encoding']) as f:
         f = f.read().lower()
     # split on page breaks using string operations
-    pagebreak = '{}_$PB$_{}'.format(randint(0, 2 ** 32), randint(0, 2 ** 32)).lower()
-    f = f.replace('<{} '.format(xml_page_tag), pagebreak)
-    f = f.replace('<{}/>'.format(xml_page_tag), pagebreak)
+    pagebreak = f'{randint(0, 2 ** 32)}_$PB$_{randint(0, 2 ** 32)}'.lower()
+    f = f.replace(f'<{xml_page_tag} ', pagebreak)
+    f = f.replace(f'<{xml_page_tag}/>', pagebreak)
     pages = f.split(pagebreak)
     # populate the mapping from window index to page id d[window_index] = {page_id, ...}
     d = {}
@@ -129,3 +133,12 @@ def get_cacheable(*args):
         for i in args[1:]:
             kwargs.update(i)
     return {k: kwargs[k] for k in kwargs if isinstance(kwargs[k], Hashable)}
+
+
+def parallel_map(fun, buff, kwargs):
+    process_pool = Pool()
+    f = partial(fun, **kwargs)
+    for _ in process_pool.map(f, buff):
+        pass
+    process_pool.close()
+    process_pool.join()

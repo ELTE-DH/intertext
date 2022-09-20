@@ -1,23 +1,16 @@
-import functools
-import multiprocessing
-
 import numpy as np
 from vectorizedMinHash import fastNGramHashes
 
-from config import CUDA_AVAILABLE, cache_location, hasher
-from utils import get_windows, get_cacheable, ngrams
 from db import write_hashbands
+from config import cache_location, hasher
+from utils import get_windows, get_cacheable, ngrams, parallel_map
 
 
+# Only this function is public in this file!
 def get_all_hashbands(kwargs):
     """Generate and save hashbands for each infile"""
-    pool = multiprocessing.Pool()
-    buff = [[idx, i] for idx, i in enumerate(kwargs['infiles'])]
-    f = functools.partial(get_file_hashbands, **kwargs)
-    for _ in pool.map(f, buff):
-        pass
-    pool.close()
-    pool.join()
+    buff = [(idx, i) for idx, i in enumerate(kwargs['infiles'])]
+    parallel_map(get_file_hashbands, buff, kwargs)
 
 
 def get_file_hashbands(args, **kwargs):
@@ -29,7 +22,7 @@ def get_file_hashbands(args, **kwargs):
     for window_idx, minhash in enumerate(minhashes):
         for hdx, h in enumerate(ngrams(minhash, kwargs['hashband_length'])):
             if hdx % kwargs['hashband_step'] == 0:
-                hashbands.add(tuple(['.'.join([str(i) for i in h]), file_idx, window_idx]))
+                hashbands.add(tuple(['.'.join(str(i) for i in h), file_idx, window_idx]))
     write_hashbands(hashbands, **kwargs)
 
 
@@ -43,7 +36,7 @@ def get_file_minhashes(file_path, **kwargs):
     buff = []
     for window_idx, window in enumerate(get_windows(file_path, **get_cacheable(kwargs))):
         char_hashes = fastNGramHashes(window.lower().encode(kwargs['encoding']), n=kwargs['chargram_length'])
-        fingerprint = hasher.fingerprint(char_hashes, cuda=CUDA_AVAILABLE)
+        fingerprint = hasher.fingerprint(char_hashes, cuda=kwargs['cuda_available'])
         buff.append(fingerprint)
     minhashes = np.array(buff)
     np.save(minhash_path, minhashes)
