@@ -2,11 +2,10 @@ import functools
 import multiprocessing
 
 import numpy as np
-from nltk import ngrams
 from vectorizedMinHash import fastNGramHashes
 
 from config import CUDA_AVAILABLE, cache_location, hasher
-from utils import get_windows, get_cacheable
+from utils import get_windows, get_cacheable, ngrams
 from db import write_hashbands
 
 

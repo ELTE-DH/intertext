@@ -1,15 +1,15 @@
-import random
-import functools
+from random import randint
 from typing import Hashable
+from functools import lru_cache
+from itertools import islice, tee
 
 from bs4 import BeautifulSoup
-from nltk import ngrams
 from unidecode import unidecode
 
 NEWLINE = '__NEWLINE__'
 
 
-@functools.lru_cache(maxsize=1024)
+@lru_cache(maxsize=1024)
 def get_words(path, **kwargs):
     """Given a file path return a list of strings from that file"""
     with get_file_handler(path, **kwargs) as f:
@@ -56,19 +56,23 @@ def get_soup(f, **kwargs):
     return soup
 
 
-@functools.lru_cache(maxsize=1024)
+def ngrams(it, n):
+    return zip(*(islice(it, i, None) for i, it in enumerate(tee(it, n))))
+
+
+@lru_cache(maxsize=1024)
 def get_windows(path, **kwargs):
     """Given a file path return a list of strings from that file"""
     words = get_words(path, **kwargs)
     buff = []
-    for idx, window in enumerate(list(ngrams(words, kwargs['window_length']))):
+    for idx, window in enumerate(ngrams(words, kwargs['window_length'])):
         if idx % kwargs['slide_length'] != 0:
             continue
         buff.append(' '.join(window))
     return buff
 
 
-@functools.lru_cache(maxsize=1024)
+@lru_cache(maxsize=1024)
 def get_window_map(path, **kwargs):
     """Get a mapping from window id to window metadata, including page id"""
     xml_page_tag = kwargs.get('xml_page_tag')
@@ -81,7 +85,7 @@ def get_window_map(path, **kwargs):
     with get_file_handler(path, **kwargs) as f:
         f = f.read().lower()
     # split on page breaks using string operations
-    pagebreak = '{}_$PB$_{}'.format(random.randint(0, 2 ** 32), random.randint(0, 2 ** 32)).lower()
+    pagebreak = '{}_$PB$_{}'.format(randint(0, 2 ** 32), randint(0, 2 ** 32)).lower()
     f = f.replace('<{} '.format(xml_page_tag), pagebreak)
     f = f.replace('<{}/>'.format(xml_page_tag), pagebreak)
     pages = f.split(pagebreak)
