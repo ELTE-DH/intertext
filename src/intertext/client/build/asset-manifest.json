@@ -1,0 +1,28 @@
+{
+  "files": {
+    "main.css": "./static/css/main.1d1feda1.chunk.css",
+    "main.js": "./static/js/main.1ffe21d0.chunk.js",
+    "main.js.map": "./static/js/main.1ffe21d0.chunk.js.map",
+    "runtime-main.js": "./static/js/runtime-main.52eccea2.js",
+    "runtime-main.js.map": "./static/js/runtime-main.52eccea2.js.map",
+    "static/css/2.21b75788.chunk.css": "./static/css/2.21b75788.chunk.css",
+    "static/js/2.9b93f97e.chunk.js": "./static/js/2.9b93f97e.chunk.js",
+    "static/js/2.9b93f97e.chunk.js.map": "./static/js/2.9b93f97e.chunk.js.map",
+    "index.html": "./index.html",
+    "static/css/2.21b75788.chunk.css.map": "./static/css/2.21b75788.chunk.css.map",
+    "static/css/main.1d1feda1.chunk.css.map": "./static/css/main.1d1feda1.chunk.css.map",
+    "static/js/2.9b93f97e.chunk.js.LICENSE.txt": "./static/js/2.9b93f97e.chunk.js.LICENSE.txt",
+    "static/media/main.css": "./static/media/YaleNew-Roman.3ac72023.otf",
+    "static/media/waffle.css": "./static/media/close-icon.9cd86fb2.svg",
+    "static/media/default-headshot.5ad2de77.jpg": "./static/media/default-headshot.5ad2de77.jpg",
+    "static/media/filter-icon.a96b9720.svg": "./static/media/filter-icon.a96b9720.svg",
+    "static/media/yale-mark.59f2ddfb.svg": "./static/media/yale-mark.59f2ddfb.svg"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.52eccea2.js",
+    "static/css/2.21b75788.chunk.css",
+    "static/js/2.9b93f97e.chunk.js",
+    "static/css/main.1d1feda1.chunk.css",
+    "static/js/main.1ffe21d0.chunk.js"
+  ]
+}

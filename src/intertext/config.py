@@ -2,10 +2,8 @@ import argparse
 import glob
 import json
 import shutil
-import zipfile
 from pathlib import Path
 
-import requests
 from vectorizedMinHash import VectorizedMinHash
 
 try:
@@ -93,8 +91,6 @@ def parse():
                         help='the maximum similarity between two files such that matches are retained', required=False)
     parser.add_argument('--output', '-o', type=Path, default=config['output'], help='the output location',
                         required=False)
-    parser.add_argument('--client', '-c', type=str, default=config['client'],
-                        help='the client version to fetch and display', required=False)
     parser.add_argument('--xml_base_tag', type=str, default=config['xml_base_tag'],
                         help='if specified, text within this parent tag will be parsed', required=False)
     parser.add_argument('--xml_remove_tags', default=config['xml_remove_tags'],
@@ -105,9 +101,6 @@ def parse():
                         help='if specified, urls can reference content within this attr of xml_page_tag')
     parser.add_argument('--strip_diacritics', default=config['strip_diacritics'],
                         help='if specified, diacritics will be parsed from texts during processing', required=False,
-                        action='store_true')
-    parser.add_argument('--update_client', default=config['update_client'],
-                        help='boolean indicating whether to update the stored client', required=False,
                         action='store_true')
     parser.add_argument('--verbose', '-v', default=config['verbose'],
                         help='if specified, the intertext process will log more operations', required=False,
@@ -124,44 +117,18 @@ def parse():
     config.update(vars(parser.parse_args()))
     if config.get('xml_remove_tags'):
         config['xml_remove_tags'] = tuple(config['xml_remove_tags'])
-    if config['update_client']:
-        remove_client(**config)
-    download_client(**config)
+    copy_client(client_location, config['output'])
     if config.get('infile_glob'):
         return config
 
 
-def remove_client(**_):
-    """Remove the cached client so it will be fetched afresh"""
-    print(' * clearing cached client')
-    if (source_location / 'client').exists():
-        shutil.rmtree(client_location)
-
-
-def download_client(**kwargs):
-    """Download the client to the cache (if necessary) and copy to the output directory"""
-    if not client_location.exists():
-        print(f' * fetching client version {kwargs["client"]}')
-        client_location.mkdir(parents=True)
-        zip_location = client_location / 'client.zip'
-        # download the zip archive
-        with open(zip_location, 'wb') as out:
-            url = f'https://lab-apps.s3-us-west-2.amazonaws.com/intertext-builds/intertext-client-' \
-                  f'{kwargs["client"]}.zip'
-            out.write(requests.get(url).content)
-        # extract the zip archive
-        with zipfile.ZipFile(zip_location) as z:
-            z.extractall(client_location)
-        # remove extant matches if user provided inputs
-        if kwargs.get('infile_glob'):
-            former_api_location = client_location / 'build' / 'api'
-            if former_api_location.exists():
-                shutil.rmtree(former_api_location)
+def copy_client(client_dir, output_dir):
+    """Copy the client to the output directory"""
     # copy the `build` directory to the output directory
-    if kwargs['output'].exists():
-        shutil.rmtree(kwargs['output'])
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
     # copy the web client
-    shutil.copytree(client_location / 'build', kwargs['output'])
+    shutil.copytree(client_dir / 'build', output_dir)
 
 
 def process_kwargs(**kwargs):

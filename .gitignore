@@ -134,4 +134,4 @@ dmypy.json
 # Project specific files
 cache/
 output/
-src/intertext/client
+!src/intertext/client/build
