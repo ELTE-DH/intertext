@@ -1,5 +1,4 @@
-from __future__ import absolute_import
-from intertext.intertext import parse
+from intertext_main import parse
 
 # specify version number
 import pkg_resources
