@@ -202,10 +202,9 @@ def stream_hashbands(kwargs):
                 f = f.read()
             # accumulate file_id, window id values by hashband to effectively sort by hashband
             for row in f.split(row_delimiter):
-                if not row:
-                    continue
-                hashband, file_id, window_id = row.split(field_delimiter)
-                d[hashband].append([int(file_id), int(window_id)])
+                if row:
+                    hashband, file_id, window_id = row.split(field_delimiter)
+                    d[hashband].append([int(file_id), int(window_id)])
             for hashband in d:
                 file_ids, window_ids = zip(*d[hashband])
                 if len(set(file_ids)) > 1:
@@ -267,9 +266,8 @@ def stream_matching_candidate_windows(file_id_a, file_id_b, **kwargs):
         with open(Path('db') / 'candidates' / str(file_id_a) / str(file_id_b)) as f:
             f = f.read()
         for row in f.split(row_delimiter):
-            if not row:
-                continue
-            yield [int(file_id_a), int(file_id_b)] + [int(i) for i in row.split(field_delimiter)]
+            if row:
+                yield [file_id_a, file_id_b] + [int(i) for i in row.split(field_delimiter)]
 
 
 def stream_file_pair_matches(file_id_a, file_id_b, **kwargs):
@@ -284,6 +282,5 @@ def stream_file_pair_matches(file_id_a, file_id_b, **kwargs):
         with open(Path('db') / 'matches' / str(file_id_a) / str(file_id_b)) as f:
             f = f.read()
             for row in f.split(row_delimiter):
-                if not row:
-                    continue
-                yield [int(file_id_a), int(file_id_b)] + [int(j) for j in row.split(field_delimiter)]
+                if row:
+                    yield [int(file_id_a), int(file_id_b)] + [int(j) for j in row.split(field_delimiter)]

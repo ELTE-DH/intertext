@@ -5,14 +5,14 @@ from collections import defaultdict
 from networkx import all_pairs_shortest_path_length, Graph
 from networkx.algorithms.components.connected import connected_components
 
-from config import parse, process_kwargs, prepare_output_directories, write_config
-from db import clear_db, initialize_db, delete_matches, stream_matching_file_id_pairs, stream_file_pair_matches
+from utils import get_words, get_cacheable
+from minhash_files import get_all_hashbands
 from format_matches import format_all_matches
 from json_output import create_all_match_json
-from match_candidates import get_all_match_candidates
-from minhash_files import get_all_hashbands
-from utils import get_words, get_cacheable
 from validate_matches import validate_all_matches
+from match_candidates import get_all_match_candidates
+from config import parse, process_kwargs, prepare_output_directories, write_config
+from db import clear_db, initialize_db, delete_matches, stream_matching_file_id_pairs, stream_file_pair_matches
 
 """
 TODO:
@@ -47,7 +47,7 @@ def process_texts(kwargs):
         initialize_db('matches', **kwargs)
 
         # minhash files & store hashbands in db
-        print(' * creating minhashes - using CUDA:', kwargs['cuda_available'])
+        print(' * creating minhashes')
         get_all_hashbands(kwargs)
 
         # find all hashbands that have multiple distict file_ids
@@ -89,27 +89,26 @@ def create_reader_data(kwargs):
 
 def banish_matches(kwargs):
     """Delete banished matches from the db"""
-    if not kwargs['banish_glob']:
-        return
-    print(' * banishing matches')
-    g = Graph()
-    for file_id_a, file_id_b in stream_matching_file_id_pairs(kwargs):
-        for _, _, window_a, window_b, sim in stream_file_pair_matches(file_id_a, file_id_b, **kwargs):
-            s = f'{file_id_a}.{window_a}'
-            t = f'{file_id_b}.{window_b}'
-            g.add_edge(s, t)
-    # create d[file_id] = [window_id, window_id] of banished windows
-    banished_dict = defaultdict(set)
-    distances = dict(all_pairs_shortest_path_length(g))
-    for i in list(connected_components(g)):
-        banished_ids = [j for j in i if int(j.split('.')[0]) in kwargs['banished_file_ids']]
-        # search up to maximum path length between nodes so nodes linked to a banished node are removed
-        for j in i:
-            if any(distances[j][k] < kwargs['banish_distance'] for k in banished_ids):
-                file_id, window_id = j.split('.')
-                banished_dict[file_id].add(window_id)
-    # remove the banished file_id, window_id tuples from the db
-    delete_matches(banished_dict, **kwargs)
+    if kwargs['banish_glob']:
+        print(' * banishing matches')
+        g = Graph()
+        for file_id_a, file_id_b in stream_matching_file_id_pairs(kwargs):
+            for _, _, window_a, window_b, sim in stream_file_pair_matches(file_id_a, file_id_b, **kwargs):
+                s = f'{file_id_a}.{window_a}'
+                t = f'{file_id_b}.{window_b}'
+                g.add_edge(s, t)
+        # create d[file_id] = [window_id, window_id] of banished windows
+        banished_dict = defaultdict(set)
+        distances = dict(all_pairs_shortest_path_length(g))
+        for i in list(connected_components(g)):
+            banished_ids = [j for j in i if int(j.split('.')[0]) in kwargs['banished_file_ids']]
+            # search up to maximum path length between nodes so nodes linked to a banished node are removed
+            for j in i:
+                if any(distances[j][k] < kwargs['banish_distance'] for k in banished_ids):
+                    file_id, window_id = j.split('.')
+                    banished_dict[file_id].add(window_id)
+        # remove the banished file_id, window_id tuples from the db
+        delete_matches(banished_dict, **kwargs)
 
 
 if __name__ == '__main__':

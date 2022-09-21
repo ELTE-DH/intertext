@@ -129,10 +129,11 @@ def get_window_map(path, **kwargs):
 def get_cacheable(*args):
     """Given a dictionary of kwargs return a dictionary with cacheable values retained"""
     kwargs = args[0]
+    new_kwargs = {k: v for k, v in kwargs.items() if isinstance(v, Hashable)}
     if len(args) > 1:
         for i in args[1:]:
-            kwargs.update(i)
-    return {k: kwargs[k] for k in kwargs if isinstance(kwargs[k], Hashable)}
+            new_kwargs.update(i)
+    return new_kwargs
 
 
 def parallel_map(fun, buff, kwargs):

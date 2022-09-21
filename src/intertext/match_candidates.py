@@ -45,19 +45,13 @@ def get_hashband_match_candidates(args, **kwargs):
             hashband_values.add(tup)
         elif hashband != last_hashband or idx == len(args) - 1:
             last_hashband = hashband
-            if kwargs.get('only_index') is not None and \
-               not any(i[0] == kwargs['only_index'] for i in hashband_values):
-                continue
-            for a, b in combinations(hashband_values, 2):
-                if kwargs.get('only_index') is not None and \
-                   a[0] != kwargs['only_index'] and b[0] != kwargs['only_index']:
-                    continue
-                # skip same file matches
-                if a[0] == b[0]:
-                    continue
-                elif a[0] < b[0]:
-                    results.append((a[0], b[0], a[1], b[1]))
-                else:
-                    results.append((b[0], a[0], b[1], a[1]))
-            hashband_values = {tup}
+            if kwargs.get('only_index') is None or any(i[0] == kwargs['only_index'] for i in hashband_values):
+                for a, b in combinations(hashband_values, 2):
+                    if kwargs.get('only_index') is None or a[0] == kwargs['only_index'] or b[0] == kwargs['only_index']:
+                        # skip same file matches
+                        if a[0] < b[0]:
+                            results.append((a[0], b[0], a[1], b[1]))
+                        elif a[0] > b[0]:
+                            results.append((b[0], a[0], b[1], a[1]))
+                hashband_values = {tup}
     return set(results)

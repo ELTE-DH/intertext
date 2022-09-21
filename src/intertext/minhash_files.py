@@ -22,7 +22,7 @@ def get_file_hashbands(args, **kwargs):
     for window_idx, minhash in enumerate(minhashes):
         for hdx, h in enumerate(ngrams(minhash, kwargs['hashband_length'])):
             if hdx % kwargs['hashband_step'] == 0:
-                hashbands.add(tuple(['.'.join(str(i) for i in h), file_idx, window_idx]))
+                hashbands.add(('.'.join(str(i) for i in h), file_idx, window_idx))
     write_hashbands(hashbands, **kwargs)
 
 
@@ -36,7 +36,7 @@ def get_file_minhashes(file_path, **kwargs):
     buff = []
     for window_idx, window in enumerate(get_windows(file_path, **get_cacheable(kwargs))):
         char_hashes = byte_hashes(window.lower().encode(kwargs['encoding']), n=kwargs['chargram_length'])
-        fingerprint = hasher.fingerprint(char_hashes, cuda=kwargs['cuda_available'])
+        fingerprint = hasher.fingerprint(char_hashes)
         buff.append(fingerprint)
     minhashes = np.array(buff)
     np.save(minhash_path, minhashes)

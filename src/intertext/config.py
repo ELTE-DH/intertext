@@ -6,14 +6,6 @@ from pathlib import Path
 
 from vminhash import VectorizedMinHash
 
-try:
-    import cupy
-
-    CUDA_AVAILABLE = True
-except:
-    CUDA_AVAILABLE = False
-
-
 hasher = VectorizedMinHash(n_perm=256)
 source_location = Path(__file__).parent
 client_location = source_location / 'client'
@@ -115,7 +107,6 @@ def parse():
     parser.add_argument('--bounter_size', default=config['bounter_size'], help='MB allocated to bounter instance',
                         required=False)
     config.update(vars(parser.parse_args()))
-    config['cuda_available'] = CUDA_AVAILABLE
     if config.get('xml_remove_tags'):
         config['xml_remove_tags'] = tuple(config['xml_remove_tags'])
     copy_client(client_location, config['output'])

@@ -8,8 +8,8 @@ from collections import defaultdict
 
 from bounter import bounter
 
-from utils import get_words, get_windows, get_window_map, get_cacheable
 from db import stream_matching_file_id_pairs, stream_file_pair_matches
+from utils import get_words, get_windows, get_window_map, get_cacheable
 
 
 # Only this function is public in this file!
@@ -32,50 +32,47 @@ def parallel_map(fun, counts, buff, kwargs):
 def format_file_matches(counts, file_args, **kwargs):
     """'Format the matches for a single file pair"""
     file_id_a, file_id_b = file_args
-    if kwargs.get('excluded_file_ids'):
-        if file_id_a in kwargs['excluded_file_ids'] or file_id_b in kwargs['excluded_file_ids']:
-            return
-    pair_matches = list(stream_file_pair_matches(file_id_a, file_id_b, **kwargs))
-    if not pair_matches:
+    if kwargs.get('excluded_file_ids') and (file_id_a in kwargs['excluded_file_ids'] or
+                                            file_id_b in kwargs['excluded_file_ids']):
         return
-    # check to see if this file pair has >= max allowed similarity
-    a_windows = get_windows(kwargs['infiles'][file_id_a], **get_cacheable(kwargs))
-    b_windows = get_windows(kwargs['infiles'][file_id_b], **get_cacheable(kwargs))
-    if kwargs['max_file_sim']:
-        if (len(pair_matches) > len(a_windows) * kwargs['max_file_sim']) or \
-                (len(pair_matches) > len(b_windows) * kwargs['max_file_sim']):
+    pair_matches = list(stream_file_pair_matches(file_id_a, file_id_b, **kwargs))
+    if pair_matches:
+        # check to see if this file pair has >= max allowed similarity
+        a_windows = get_windows(kwargs['infiles'][file_id_a], **get_cacheable(kwargs))
+        b_windows = get_windows(kwargs['infiles'][file_id_b], **get_cacheable(kwargs))
+        if kwargs['max_file_sim'] and ((len(pair_matches) > len(a_windows) * kwargs['max_file_sim']) or
+                                       (len(pair_matches) > len(b_windows) * kwargs['max_file_sim'])):
             print(' * file pair', *file_args, 'has >= max_file_sim; skipping!')
-            return []
-    # cluster the matches so sequential matching windows are grouped into a single match
-    clusters = []
-    _, _, window_a, window_b, sims = zip(*pair_matches)
-    d = defaultdict(lambda: defaultdict())
-    for a, b, sim in zip(window_a, window_b, sims):
-        d[a][b] = sim
-    for a in get_sequences(window_a):
-        for b in get_sequences(window_b):
-            cluster = {'a': set(), 'b': set(), 'sim': []}
-            for a_i in a:
-                for b_i in b:
-                    if d.get(a_i, {}).get(b_i):
-                        cluster['a'].add(a_i)
-                        cluster['b'].add(b_i)
-                        cluster['sim'].append(d[a_i][b_i])
-            if cluster['a'] and cluster['b']:
-                sim = int(sum(cluster['sim']) / len(cluster['sim']))
-                if sim < kwargs['min_sim']:
-                    continue
-                clusters.append({
-                    'a': sorted(cluster['a']),
-                    'b': sorted(cluster['b']),
-                    'sim': sim,
-                })
-    # format the matches, then save into both file_id_a and file_id_b directories
-    formatted = format_matches(file_id_a, file_id_b, clusters, counts, **kwargs)
-    for i in (file_id_a, file_id_b):
-        out_dir = kwargs['output'] / 'api' / 'matches' / str(i)
-        with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w') as out:
-            json.dump(formatted, out)
+            return
+        # cluster the matches so sequential matching windows are grouped into a single match
+        clusters = []
+        _, _, window_a, window_b, sims = zip(*pair_matches)
+        d = defaultdict(lambda: {})
+        for a, b, sim in zip(window_a, window_b, sims):
+            d[a][b] = sim
+        for a in get_sequences(window_a):
+            for b in get_sequences(window_b):
+                cluster = {'a': set(), 'b': set(), 'sim': []}
+                for a_i in a:
+                    for b_i in b:
+                        if d[a_i].get(b_i):
+                            cluster['a'].add(a_i)
+                            cluster['b'].add(b_i)
+                            cluster['sim'].append(d[a_i][b_i])
+                if cluster['a'] and cluster['b']:
+                    sim = int(sum(cluster['sim']) / len(cluster['sim']))
+                    if sim >= kwargs['min_sim']:
+                        clusters.append({
+                            'a': sorted(cluster['a']),
+                            'b': sorted(cluster['b']),
+                            'sim': sim,
+                        })
+        # format the matches, then save into both file_id_a and file_id_b directories
+        formatted = format_matches(file_id_a, file_id_b, clusters, counts, **kwargs)
+        for i in (file_id_a, file_id_b):
+            out_dir = kwargs['output'] / 'api' / 'matches' / str(i)
+            with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w') as out:
+                json.dump(formatted, out)
 
 
 def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
@@ -135,30 +132,22 @@ def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
 
 def get_url(meta, windows_to_page, windows, **kwargs):
     """Return the url to the first of the current windows"""
-    if not kwargs.get('xml_page_tag'):
-        return meta.get('url', '')
-    return meta.get('url', '').replace('$PAGE_ID', windows_to_page.get(windows[0], ''))
+    ret = meta.get('url', '')
+    if kwargs.get('xml_page_tag'):
+        ret = ret.replace('$PAGE_ID', windows_to_page.get(windows[0], ''))
+    return ret
 
 
 def order_match_pair(file_id_a, file_id_b, clusters, **kwargs):
     """Set file id a to the previously published file (if relevant)"""
     a_meta = kwargs.get('metadata', {}).get(Path(kwargs['infiles'][file_id_a]).name, {})
     b_meta = kwargs.get('metadata', {}).get(Path(kwargs['infiles'][file_id_b]).name, {})
-    if a_meta and \
-            b_meta and \
-            a_meta.get('year') and \
-            b_meta.get('year') and \
+    if a_meta and b_meta and \
+            a_meta.get('year') and b_meta.get('year') and \
             b_meta.get('year') < a_meta.get('year'):
-        return [
-            file_id_b,
-            file_id_a,
-            [{'a': c['b'], 'b': c['a'], 'sim': c['sim']} for c in deepcopy(clusters)]
-        ]
-    return [
-        file_id_a,
-        file_id_b,
-        clusters,
-    ]
+        return [file_id_b, file_id_a, [{'a': c['b'], 'b': c['a'], 'sim': c['sim']} for c in deepcopy(clusters)]]
+    else:
+        return [file_id_a, file_id_b, clusters]
 
 
 def get_match_strings(words, window_ids, **kwargs):
@@ -185,15 +174,15 @@ def get_sequences(arg):
 
 def get_word_counts(kwargs):
     """Return a bounter.bounter instance if user requested string likelihoods, else None"""
-    if not kwargs.get('compute_probabilities'):
-        return None
-    print(' * computing word counts')
-    counts = bounter(size_mb=int(kwargs.get('bounter_size')))
-    for i in kwargs['infiles']:
-        words = get_words(i, **get_cacheable(kwargs))
-        counts.update(words)
-    print(' * finished computing word counts')
-    return counts
+    if kwargs.get('compute_probabilities'):
+        print(' * computing word counts')
+        counts = bounter(size_mb=int(kwargs.get('bounter_size')))
+        for i in kwargs['infiles']:
+            words = get_words(i, **get_cacheable(kwargs))
+            counts.update(words)
+        print(' * finished computing word counts')
+        return counts
+    return None
 
 
 def get_string_prob(a, b, counts):
