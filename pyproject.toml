@@ -16,6 +16,9 @@ bounter = "^1.1.1" # >=1.1.1 and <2.0
 networkx = "^2.8.6" # >=2.8.6 and <3.0
 numpy = "^1.23.3" # >=1.23.3 and <2.0
 unidecode = "^1.3.4" # >=1.3.4 and <2.0
+tqdm = "^4.64.1" # >=4.64.1 and <5.0
+# Compiling is very slow. The appropriate cupy-cuda* precompiled package is recommended!
+# See also: https://docs.cupy.dev/en/stable/install.html#installing-cupy-from-pypi
 cupy = { version = "*", optional = true }
 
 [tool.poetry.extras]

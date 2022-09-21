@@ -18,7 +18,8 @@ __clean-extra-deps:
 .PHONY: __clean-extra-deps
 
 clean: __clean-extra-deps
-	@rm -rf dist/ $$(./venv/bin/poetry env info -p) venv/ cache output
+	@if [ -f "./venv/bin/poetry" ]; then rm -rf $$(./venv/bin/poetry env info -p); fi
+	@rm -rf dist/ venv/ cache output
 .PHONY: clean
 
 venv:

@@ -22,6 +22,14 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "colorama"
+version = "0.4.5"
+description = "Cross-platform colored terminal text."
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+
+[[package]]
 name = "cupy"
 version = "11.1.0"
 description = "CuPy: NumPy & SciPy for GPU"
@@ -78,6 +86,23 @@ optional = false
 python-versions = ">=3.6"
 
 [[package]]
+name = "tqdm"
+version = "4.64.1"
+description = "Fast, Extensible Progress Meter"
+category = "main"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
+
+[package.dependencies]
+colorama = {version = "*", markers = "platform_system == \"Windows\""}
+
+[package.extras]
+dev = ["py-make (>=0.1.0)", "twine", "wheel"]
+notebook = ["ipywidgets (>=6)"]
+slack = ["slack-sdk"]
+telegram = ["requests"]
+
+[[package]]
 name = "Unidecode"
 version = "1.3.4"
 description = "ASCII transliterations of Unicode text"
@@ -91,7 +116,7 @@ cupy = ["cupy"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8" # >=3.8 and <4.0
-content-hash = "98d69348f788c713e727cf898fd8a5023d9d889a817a7edc345a46d68a384f87"
+content-hash = "b31c06999806d66098417449adb398b1e5e3fb9010ac112061df95632033f8e2"
 
 [metadata.files]
 beautifulsoup4 = [
@@ -100,6 +125,10 @@ beautifulsoup4 = [
 ]
 bounter = [
     {file = "bounter-1.1.1.tar.gz", hash = "sha256:ef578c7e8132a7b3f3ccf5998f3329df2ffbaa58ff1eb8eaa5bc3f613a4b3bba"},
+]
+colorama = [
+    {file = "colorama-0.4.5-py2.py3-none-any.whl", hash = "sha256:854bf444933e37f5824ae7bfc1e98d5bce2ebe4160d46b5edf346a89358e99da"},
+    {file = "colorama-0.4.5.tar.gz", hash = "sha256:e6c6b4334fc50988a639d9b98aa429a0b57da6e17b9a44f0451f930b6967b7a4"},
 ]
 cupy = [
     {file = "cupy-11.1.0.tar.gz", hash = "sha256:e13b6f990addd7bd870905af429fad51084d0857f8600dd3206a1df5a4684edd"},
@@ -171,6 +200,10 @@ numpy = [
 soupsieve = [
     {file = "soupsieve-2.3.2.post1-py3-none-any.whl", hash = "sha256:3b2503d3c7084a42b1ebd08116e5f81aadfaea95863628c80a3b774a11b7c759"},
     {file = "soupsieve-2.3.2.post1.tar.gz", hash = "sha256:fc53893b3da2c33de295667a0e19f078c14bf86544af307354de5fcf12a3f30d"},
+]
+tqdm = [
+    {file = "tqdm-4.64.1-py2.py3-none-any.whl", hash = "sha256:6fee160d6ffcd1b1c68c65f14c829c22832bc401726335ce92c52d395944a6a1"},
+    {file = "tqdm-4.64.1.tar.gz", hash = "sha256:5f4f682a004951c1b450bc753c710e9280c5746ce6ffedee253ddbcbf54cf1e4"},
 ]
 Unidecode = [
     {file = "Unidecode-1.3.4-py3-none-any.whl", hash = "sha256:afa04efcdd818a93237574791be9b2817d7077c25a068b00f8cff7baa4e59257"},

@@ -1,5 +1,5 @@
 import numpy as np
-from vectorized_minhash import fastNGramHashes
+from vminhash import byte_hashes
 
 from db import write_hashbands
 from config import cache_location, hasher
@@ -35,7 +35,7 @@ def get_file_minhashes(file_path, **kwargs):
     # run minhash algorithm on file
     buff = []
     for window_idx, window in enumerate(get_windows(file_path, **get_cacheable(kwargs))):
-        char_hashes = fastNGramHashes(window.lower().encode(kwargs['encoding']), n=kwargs['chargram_length'])
+        char_hashes = byte_hashes(window.lower().encode(kwargs['encoding']), n=kwargs['chargram_length'])
         fingerprint = hasher.fingerprint(char_hashes, cuda=kwargs['cuda_available'])
         buff.append(fingerprint)
     minhashes = np.array(buff)
