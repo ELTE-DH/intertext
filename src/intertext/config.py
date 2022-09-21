@@ -4,7 +4,7 @@ import shutil
 import argparse
 from pathlib import Path
 
-from vectorizedMinHash import VectorizedMinHash
+from vectorized_minhash import VectorizedMinHash
 
 try:
     import cupy

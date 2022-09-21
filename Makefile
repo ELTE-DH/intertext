@@ -23,9 +23,9 @@ clean: __clean-extra-deps
 
 venv:
 	rm -rf venv
-	python3.7 -m venv venv
+	python3 -m venv venv
 	./venv/bin/pip install poetry
-	./venv/bin/poetry env use python3.7
+	./venv/bin/poetry env use python3
 	./venv/bin/poetry install
 .PHONY: venv
 

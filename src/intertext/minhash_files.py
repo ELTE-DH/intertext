@@ -1,5 +1,5 @@
 import numpy as np
-from vectorizedMinHash import fastNGramHashes
+from vectorized_minhash import fastNGramHashes
 
 from db import write_hashbands
 from config import cache_location, hasher
