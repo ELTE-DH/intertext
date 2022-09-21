@@ -84,7 +84,7 @@ def create_reader_data(kwargs):
     for idx, i in enumerate(kwargs['infiles']):
         words = get_words(i, **get_cacheable(kwargs, {'display': True}))
         with open(Path(kwargs['output']) / 'api' / 'texts' / f'{idx}.json', 'w') as out:
-            json.dump(words, out)
+            json.dump(words, out, ensure_ascii=False)
 
 
 def banish_matches(kwargs):

@@ -212,4 +212,4 @@ def write_config(kwargs):
             'metadata': metadata,
             'window_size': kwargs['window_length'],
             'window_slide': kwargs['slide_length'],
-        }, out)
+        }, out, ensure_ascii=False)

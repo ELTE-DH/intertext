@@ -18,7 +18,7 @@ def create_all_match_json(kwargs):
         for i in buff:
             i['_id'] = guid_to_int[i['_id']]
         with open(f'{match_directory}.json', 'w') as out:
-            json.dump(buff, out)
+            json.dump(buff, out, ensure_ascii=False)
         rmtree(match_directory)
 
     # create minimal representations of all matches to be sorted by each sort heuristic below
@@ -53,7 +53,7 @@ def create_all_match_json(kwargs):
             sorted_list = sorted(buff, key=lambda x: x[idx], reverse=inverse_order)
             ids = [conv_to_ints(i[:6]) for i in sorted_list]
             with open(kwargs['output'] / 'api' / 'indices' / f'match-ids-by-{label}.json', 'w') as out:
-                json.dump(ids, out)
+                json.dump(ids, out, ensure_ascii=False)
 
     # create the scatterplot data
     write_scatterplots(kwargs)
@@ -99,7 +99,7 @@ def write_scatterplots(kwargs):
                     })
                 # write the scatterplot data
                 with open(Path(out_dir) / f'{i}-{j}-{k}.json', 'w') as out:
-                    json.dump(scatterplot_data, out)
+                    json.dump(scatterplot_data, out, ensure_ascii=False)
 
 
 def stream_match_lists(kwargs):

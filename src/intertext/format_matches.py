@@ -72,7 +72,7 @@ def format_file_matches(counts, file_args, **kwargs):
         for i in (file_id_a, file_id_b):
             out_dir = kwargs['output'] / 'api' / 'matches' / str(i)
             with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w') as out:
-                json.dump(formatted, out)
+                json.dump(formatted, out, ensure_ascii=False)
 
 
 def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
