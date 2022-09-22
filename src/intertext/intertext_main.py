@@ -5,6 +5,7 @@ from collections import defaultdict
 from networkx import all_pairs_shortest_path_length, Graph
 from networkx.algorithms.components.connected import connected_components
 
+
 from utils import get_words, get_cacheable
 from minhash_files import get_all_hashbands
 from format_matches import format_all_matches
@@ -12,7 +13,6 @@ from json_output import create_all_match_json
 from validate_matches import validate_all_matches
 from match_candidates import get_all_match_candidates
 from config import parse, process_kwargs, prepare_output_directories, write_config
-from db import clear_db, initialize_db, delete_matches, stream_matching_file_id_pairs, stream_file_pair_matches
 
 """
 TODO:
@@ -39,12 +39,12 @@ def process_texts(kwargs):
     # update the metadata and exit if requested
     if not kwargs.get('update_metadata'):
         # remove extant db and prepare output directories
-        clear_db()
+        kwargs['db']['functions']['clear_db']()
 
         # create the db
-        initialize_db('hashbands', **kwargs)
-        initialize_db('candidates', **kwargs)
-        initialize_db('matches', **kwargs)
+        kwargs['db']['functions']['initialize_db']('hashbands')
+        kwargs['db']['functions']['initialize_db']('candidates')
+        kwargs['db']['functions']['initialize_db']('matches')
 
         # minhash files & store hashbands in db
         print(' * creating minhashes')
@@ -92,8 +92,9 @@ def banish_matches(kwargs):
     if kwargs['banish_glob']:
         print(' * banishing matches')
         g = Graph()
-        for file_id_a, file_id_b in stream_matching_file_id_pairs(kwargs):
-            for _, _, window_a, window_b, sim in stream_file_pair_matches(file_id_a, file_id_b, **kwargs):
+        for file_id_a, file_id_b in kwargs['db']['functions']['stream_matching_file_id_pairs']():
+            for _, _, window_a, window_b, sim \
+                    in kwargs['db']['functions']['stream_file_pair_matches'](file_id_a, file_id_b):
                 s = f'{file_id_a}.{window_a}'
                 t = f'{file_id_b}.{window_b}'
                 g.add_edge(s, t)
@@ -108,7 +109,7 @@ def banish_matches(kwargs):
                     file_id, window_id = j.split('.')
                     banished_dict[file_id].add(window_id)
         # remove the banished file_id, window_id tuples from the db
-        delete_matches(banished_dict, **kwargs)
+        kwargs['db']['functions']['delete_matches'](banished_dict)
 
 
 if __name__ == '__main__':

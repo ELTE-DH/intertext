@@ -8,14 +8,13 @@ from collections import defaultdict
 
 from bounter import bounter
 
-from db import stream_matching_file_id_pairs, stream_file_pair_matches
 from utils import get_words, get_windows, get_window_map, get_cacheable
 
 
 # Only this function is public in this file!
 def format_all_matches(kwargs):
     """Format the match objects for each infile and store as JSON"""
-    pairs = stream_matching_file_id_pairs(kwargs)
+    pairs = kwargs['db']['functions']['stream_matching_file_id_pairs']()
     # obtain global counts of terms across corpus
     parallel_map(format_file_matches, get_word_counts(kwargs), pairs, kwargs)
 
@@ -35,7 +34,7 @@ def format_file_matches(counts, file_args, **kwargs):
     if kwargs.get('excluded_file_ids') and (file_id_a in kwargs['excluded_file_ids'] or
                                             file_id_b in kwargs['excluded_file_ids']):
         return
-    pair_matches = list(stream_file_pair_matches(file_id_a, file_id_b, **kwargs))
+    pair_matches = list(kwargs['db']['functions']['stream_file_pair_matches'](file_id_a, file_id_b))
     if pair_matches:
         # check to see if this file pair has >= max allowed similarity
         a_windows = get_windows(kwargs['infiles'][file_id_a], **get_cacheable(kwargs))

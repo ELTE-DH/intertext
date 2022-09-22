@@ -3,13 +3,12 @@ from functools import partial
 from itertools import combinations
 
 from utils import chunked_iterator
-from db import write_candidates, stream_hashbands
 
 
 def get_all_match_candidates(kwargs):
     """Find all hashbands that have multiple distinct file_ids and save as match candidates"""
     # the hashbands table is our largest data artifact - paginate in blocks
-    for chunk in chunked_iterator(stream_hashbands(kwargs), kwargs['batch_size']):
+    for chunk in chunked_iterator(kwargs['db']['functions']['stream_hashbands'](), kwargs['batch_size']):
         process_candidate_hashbands(list(chunk), **kwargs)
 
 
@@ -26,10 +25,10 @@ def process_candidate_hashbands(inp_hashbands, **kwargs):
     for idx, i in enumerate(pool.map(fun, hashbands)):
         writes.update(i)
         if len(writes) >= kwargs['write_frequency'] or idx == len(hashbands) - 1:
-            write_candidates(writes, **kwargs)
+            kwargs['db']['functions']['write_candidates'](writes)
             writes = set()
     if writes:
-        write_candidates(writes, **kwargs)
+        kwargs['db']['functions']['write_candidates'](writes)
     pool.close()
     pool.join()
 

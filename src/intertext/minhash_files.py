@@ -1,8 +1,6 @@
 import numpy as np
 from vminhash import byte_hashes
 
-from db import write_hashbands
-from config import cache_location, hasher
 from utils import get_windows, get_cacheable, ngrams, parallel_map
 
 
@@ -23,12 +21,12 @@ def get_file_hashbands(args, **kwargs):
         for hdx, h in enumerate(ngrams(minhash, kwargs['hashband_length'])):
             if hdx % kwargs['hashband_step'] == 0:
                 hashbands.add(('.'.join(str(i) for i in h), file_idx, window_idx))
-    write_hashbands(hashbands, **kwargs)
+    kwargs['db']['functions']['write_hashbands'](hashbands)
 
 
 def get_file_minhashes(file_path, **kwargs):
     """Return the minhash array for a file"""
-    minhash_path = cache_location / 'minhashes' / (str(file_path).replace('/', '___') + '.npy')
+    minhash_path = kwargs['cache_location'] / 'minhashes' / (str(file_path).replace('/', '___') + '.npy')
     if minhash_path.exists():
         print(' * loading', file_path, 'minhashes from cache')
         return np.load(minhash_path)
@@ -36,7 +34,7 @@ def get_file_minhashes(file_path, **kwargs):
     buff = []
     for window_idx, window in enumerate(get_windows(file_path, **get_cacheable(kwargs))):
         char_hashes = byte_hashes(window.lower().encode(kwargs['encoding']), n=kwargs['chargram_length'])
-        fingerprint = hasher.fingerprint(char_hashes)
+        fingerprint = kwargs['hasher'].fingerprint(char_hashes)
         buff.append(fingerprint)
     minhashes = np.array(buff)
     np.save(minhash_path, minhashes)

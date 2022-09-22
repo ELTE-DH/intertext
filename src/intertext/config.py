@@ -3,15 +3,17 @@ import json
 import shutil
 import argparse
 from pathlib import Path
+from functools import partial
+
+from db_file import write_hashbands_file, write_candidates_file, write_matches_file, delete_matches_file, \
+    stream_hashbands_file, stream_candidate_file_id_pairs_file, stream_matching_file_id_pairs_file, \
+    stream_matching_candidate_windows_file, stream_file_pair_matches_file, clear_db_file, initialize_db_file
+from db_sql import write_hashbands_sql, write_candidates_sql, write_matches_sql, delete_matches_sql, \
+    stream_hashbands_sql, stream_candidate_file_id_pairs_sql, stream_matching_file_id_pairs_sql, \
+    stream_matching_candidate_windows_sql, stream_file_pair_matches_sql, clear_db_sql, initialize_db_sql
 
 from vminhash import VectorizedMinHash
 
-hasher = VectorizedMinHash(n_perm=256)
-source_location = Path(__file__).parent
-client_location = source_location / 'client'
-cache_location = Path('.') / 'cache'
-row_delimiter = '\n'
-field_delimiter = '-'
 
 config = {
     'infile_glob': '',
@@ -107,9 +109,6 @@ def parse():
     parser.add_argument('--bounter_size', default=config['bounter_size'], help='MB allocated to bounter instance',
                         required=False)
     config.update(vars(parser.parse_args()))
-    if config.get('xml_remove_tags'):
-        config['xml_remove_tags'] = tuple(config['xml_remove_tags'])
-    copy_client(client_location, config['output'])
     if config.get('infile_glob'):
         return config
 
@@ -160,6 +159,75 @@ def process_kwargs(kwargs):
     if kwargs.get('only') is not None:
         kwargs['only_index'] = kwargs['infiles'].index(kwargs['only'])
 
+    kwargs['hasher'] = VectorizedMinHash(n_perm=256)
+    source_location = Path(__file__).parent
+    client_location = source_location / 'client'
+    cache_location = Path('.') / 'cache'
+    kwargs['cache_location'] = cache_location
+    row_delimiter = '\n'
+    field_delimiter = '-'
+
+    if kwargs.get('xml_remove_tags'):
+        kwargs['xml_remove_tags'] = tuple(kwargs['xml_remove_tags'])
+    copy_client(client_location, kwargs['output'])
+
+    verbose = kwargs.get('verbose')
+    if kwargs['db'] == 'sqlite':
+        kwargs['db'] = {}
+        kwargs['db']['functions'] = {}
+        kwargs['db']['functions']['clear_db'] = clear_db_sql
+        kwargs['db']['functions']['initialize_db'] = partial(initialize_db_sql, cache_location=cache_location)
+        kwargs['db']['functions']['write_hashbands'] = partial(write_hashbands_sql, verbose=verbose,
+                                                               cache_location=cache_location)
+        kwargs['db']['functions']['write_candidates'] = partial(write_candidates_sql, verbose=verbose,
+                                                                cache_location=cache_location)
+        kwargs['db']['functions']['write_matches'] = partial(write_matches_sql, verbose=verbose,
+                                                             cache_location=cache_location)
+        kwargs['db']['functions']['delete_matches'] = partial(delete_matches_sql, verbose=verbose,
+                                                              cache_location=cache_location)
+        kwargs['db']['functions']['stream_hashbands'] = partial(stream_hashbands_sql, verbose=verbose,
+                                                                cache_location=cache_location)
+        kwargs['db']['functions']['stream_candidate_file_id_pairs'] = partial(stream_candidate_file_id_pairs_sql,
+                                                                              verbose=verbose,
+                                                                              cache_location=cache_location)
+        kwargs['db']['functions']['stream_matching_file_id_pairs'] = partial(stream_matching_file_id_pairs_sql,
+                                                                             cache_location=cache_location)
+        kwargs['db']['functions']['stream_matching_candidate_windows'] = partial(stream_matching_candidate_windows_sql,
+                                                                                 verbose=verbose,
+                                                                                 cache_location=cache_location)
+        kwargs['db']['functions']['stream_file_pair_matches'] = partial(stream_file_pair_matches_sql,
+                                                                        cache_location=cache_location)
+    else:
+        kwargs['db'] = {}
+        kwargs['db']['functions'] = {}
+        kwargs['db']['functions']['clear_db'] = clear_db_file
+        kwargs['db']['functions']['initialize_db'] = initialize_db_file
+        kwargs['db']['functions']['write_hashbands'] = partial(write_hashbands_file, verbose=verbose,
+                                                               row_delimiter=row_delimiter,
+                                                               field_delimiter=field_delimiter)
+        kwargs['db']['functions']['write_candidates'] = partial(write_candidates_file, verbose=verbose,
+                                                                row_delimiter=row_delimiter,
+                                                                field_delimiter=field_delimiter)
+        kwargs['db']['functions']['write_matches'] = partial(write_matches_file, verbose=verbose,
+                                                             row_delimiter=row_delimiter,
+                                                             field_delimiter=field_delimiter)
+        kwargs['db']['functions']['delete_matches'] = partial(delete_matches_file, verbose=verbose,
+                                                              row_delimiter=row_delimiter,
+                                                              field_delimiter=field_delimiter)
+        kwargs['db']['functions']['stream_hashbands'] = partial(stream_hashbands_file, verbose=verbose,
+                                                                row_delimiter=row_delimiter,
+                                                                field_delimiter=field_delimiter)
+        kwargs['db']['functions']['stream_candidate_file_id_pairs'] = partial(stream_candidate_file_id_pairs_file,
+                                                                              verbose=verbose)
+        kwargs['db']['functions']['stream_matching_file_id_pairs'] = stream_matching_file_id_pairs_file
+        kwargs['db']['functions']['stream_matching_candidate_windows'] = partial(stream_matching_candidate_windows_file,
+                                                                                 verbose=verbose,
+                                                                                 row_delimiter=row_delimiter,
+                                                                                 field_delimiter=field_delimiter)
+        kwargs['db']['functions']['stream_file_pair_matches'] = partial(stream_file_pair_matches_file,
+                                                                        row_delimiter=row_delimiter,
+                                                                        field_delimiter=field_delimiter)
+
     # return the processed kwargs
     return kwargs
 
@@ -187,7 +255,7 @@ def prepare_output_directories(kwargs):
         (kwargs['output'] / 'api' / i).mkdir(parents=True, exist_ok=True)
 
     for i in ('minhashes',):
-        (cache_location / i).mkdir(parents=True, exist_ok=True)
+        (kwargs['cache_location'] / i).mkdir(parents=True, exist_ok=True)
 
     for i in range(len(kwargs['infiles'])):
         (kwargs['output'] / 'api' / 'matches' / str(i)).mkdir(parents=True, exist_ok=True)
