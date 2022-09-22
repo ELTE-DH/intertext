@@ -47,6 +47,7 @@ config = {
     'verbose': False,
     'compute_probabilities': False,
     'bounter_size': 64,
+    'display': False,
 }
 
 

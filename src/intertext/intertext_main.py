@@ -6,7 +6,7 @@ from networkx import all_pairs_shortest_path_length, Graph
 from networkx.algorithms.components.connected import connected_components
 
 
-from utils import get_words, get_cacheable
+from utils import get_words
 from minhash_files import get_all_hashbands
 from format_matches import format_all_matches
 from json_output import create_all_match_json
@@ -48,7 +48,11 @@ def process_texts(kwargs):
 
         # minhash files & store hashbands in db
         print(' * creating minhashes')
-        get_all_hashbands(kwargs)
+        get_all_hashbands(kwargs['infiles'], kwargs['cache_location'], kwargs['hasher'], kwargs['encoding'],
+                          kwargs['xml_base_tag'], kwargs['xml_remove_tags'], kwargs['strip_diacritics'],
+                          kwargs['display'], kwargs['window_length'], kwargs['slide_length'], kwargs['chargram_length'],
+                          kwargs['hashband_length'], kwargs['hashband_step'],
+                          kwargs['db']['functions']['write_hashbands'])
 
         # find all hashbands that have multiple distict file_ids
         print(' * identifying match candidates')
@@ -56,7 +60,13 @@ def process_texts(kwargs):
 
         # validate matches from among the candidates
         print(' * validating matches')
-        validate_all_matches(kwargs)
+        validate_all_matches(kwargs['infiles'], kwargs['encoding'], kwargs['xml_base_tag'],
+                             kwargs['xml_remove_tags'], kwargs['strip_diacritics'], kwargs['display'],
+                             kwargs['window_length'], kwargs['slide_length'],
+                             kwargs['min_sim'],
+                             kwargs['db']['functions']['stream_candidate_file_id_pairs'],
+                             kwargs['db']['functions']['stream_matching_candidate_windows'],
+                             kwargs['db']['functions']['write_matches'])
 
     # banish matches if necessary
     if kwargs['banish_glob']:
@@ -82,7 +92,8 @@ def process_texts(kwargs):
 def create_reader_data(kwargs):
     """Create the data to be used in the reader view"""
     for idx, i in enumerate(kwargs['infiles']):
-        words = get_words(i, **get_cacheable(kwargs, {'display': True}))
+        words = get_words(i, kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
+                          kwargs['strip_diacritics'], True)
         with open(Path(kwargs['output']) / 'api' / 'texts' / f'{idx}.json', 'w') as out:
             json.dump(words, out, ensure_ascii=False)
 

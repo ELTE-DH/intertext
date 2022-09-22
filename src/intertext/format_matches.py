@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from bounter import bounter
 
-from utils import get_words, get_windows, get_window_map, get_cacheable
+from utils import get_words, get_windows, get_window_map
 
 
 # Only this function is public in this file!
@@ -37,8 +37,12 @@ def format_file_matches(counts, file_args, **kwargs):
     pair_matches = list(kwargs['db']['functions']['stream_file_pair_matches'](file_id_a, file_id_b))
     if pair_matches:
         # check to see if this file pair has >= max allowed similarity
-        a_windows = get_windows(kwargs['infiles'][file_id_a], **get_cacheable(kwargs))
-        b_windows = get_windows(kwargs['infiles'][file_id_b], **get_cacheable(kwargs))
+        a_windows = get_windows(kwargs['infiles'][file_id_a], kwargs['encoding'], kwargs['xml_base_tag'],
+                                kwargs['xml_remove_tags'], kwargs['strip_diacritics'], kwargs['display'],
+                                kwargs['window_length'], kwargs['slide_length'])
+        b_windows = get_windows(kwargs['infiles'][file_id_b], kwargs['encoding'], kwargs['xml_base_tag'],
+                                kwargs['xml_remove_tags'], kwargs['strip_diacritics'], kwargs['display'],
+                                kwargs['window_length'], kwargs['slide_length'])
         if kwargs['max_file_sim'] and ((len(pair_matches) > len(a_windows) * kwargs['max_file_sim']) or
                                        (len(pair_matches) > len(b_windows) * kwargs['max_file_sim'])):
             print(' * file pair', *file_args, 'has >= max_file_sim; skipping!')
@@ -84,21 +88,25 @@ def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
     a_meta = kwargs.get('metadata', {}).get(bn_a, {})
     b_meta = kwargs.get('metadata', {}).get(bn_b, {})
     # format the matches
-    a_words = get_words(path_a, **get_cacheable(kwargs, {'display': True}))
-    b_words = get_words(path_b, **get_cacheable(kwargs, {'display': True}))
+    a_words = get_words(path_a, kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
+                        kwargs['strip_diacritics'], True)
+    b_words = get_words(path_b, kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
+                        kwargs['strip_diacritics'], True)
     formatted = []
     # fetch a mapping from window id to $PAGE elements if necessary
     a_windows_to_page = None
     b_windows_to_page = None
     try:
-        a_windows_to_page = get_window_map(path_a, **get_cacheable(kwargs))
-        b_windows_to_page = get_window_map(path_b, **get_cacheable(kwargs))
+        a_windows_to_page = get_window_map(path_a,  kwargs['xml_page_tag'], kwargs['xml_page_attr'], kwargs['encoding'],
+                                           kwargs['slide_length'])
+        b_windows_to_page = get_window_map(path_b, kwargs['xml_page_tag'], kwargs['xml_page_attr'], kwargs['encoding'],
+                                           kwargs['slide_length'])
     except:
         print(' * unable to retrieve mapping from window to page id')
     # each member c in clusters is a dictionary {a: b: } where values contain the match windows
     for c in clusters:
-        a_strings = get_match_strings(a_words, c['a'], **get_cacheable(kwargs))
-        b_strings = get_match_strings(b_words, c['b'], **get_cacheable(kwargs))
+        a_strings = get_match_strings(a_words, c['a'], kwargs['slide_length'], kwargs['window_length'])
+        b_strings = get_match_strings(b_words, c['b'], kwargs['slide_length'], kwargs['window_length'])
         formatted.append({
             '_id': str(uuid4()),
             'similarity': c['sim'],
@@ -149,14 +157,14 @@ def order_match_pair(file_id_a, file_id_b, clusters, **kwargs):
         return [file_id_a, file_id_b, clusters]
 
 
-def get_match_strings(words, window_ids, **kwargs):
+def get_match_strings(words, window_ids, slide_length, window_length):
     """Given a list of words and window ids, format prematch, match, and postmatch strings for a match"""
-    start = min(window_ids) * kwargs['slide_length']
-    end = max(window_ids) * kwargs['slide_length'] + kwargs['window_length']
+    start = min(window_ids) * slide_length
+    end = max(window_ids) * slide_length + window_length
     return {
-        'prematch': ' '.join(words[max(0, start - kwargs['window_length']):start]).lstrip('<br/>'),
+        'prematch': ' '.join(words[max(0, start - window_length):start]).lstrip('<br/>'),
         'match': ' '.join(words[start:end]),
-        'postmatch': ' '.join(words[end:end + kwargs['window_length']]).rstrip('<br/>'),
+        'postmatch': ' '.join(words[end:end + window_length]).rstrip('<br/>'),
     }
 
 
@@ -177,7 +185,8 @@ def get_word_counts(kwargs):
         print(' * computing word counts')
         counts = bounter(size_mb=int(kwargs.get('bounter_size')))
         for i in kwargs['infiles']:
-            words = get_words(i, **get_cacheable(kwargs))
+            words = get_words(i, kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
+                              kwargs['strip_diacritics'], kwargs['display'])
             counts.update(words)
         print(' * finished computing word counts')
         return counts

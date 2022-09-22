@@ -10,18 +10,19 @@ from unidecode import unidecode
 
 
 @lru_cache(maxsize=1024)
-def get_words(path, **kwargs):
+def get_words(path, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display):
     """Given a file path return a list of strings from that file"""
-    with open(path, encoding=kwargs['encoding']) as f:
-        if kwargs['xml_base_tag']:
-            f = get_soup_text(f, **kwargs)
+
+    with open(path, encoding=encoding) as f:
+        if xml_base_tag:
+            f = get_soup_text(f, xml_base_tag, xml_remove_tags)
         else:
             f = f.read()
     # optionally remove diacritics
-    if kwargs['strip_diacritics'] and not kwargs.get('display', False):
+    if strip_diacritics and not display:
         f = unidecode(f)
     # optionally format the list of words for display in the web viewer
-    if kwargs.get('display', False):
+    if display:
         lines = f.replace('\n', ' __NEWLINE__ ').split()
         formatted = []
         for idx, i in enumerate(lines):
@@ -36,14 +37,14 @@ def get_words(path, **kwargs):
         return f.split()
 
 
-def get_soup_text(f, **kwargs):
+def get_soup_text(f, xml_base_tag, xml_remove_tags):
     """Return a soup object given a _io.TextIOWrapper object"""
-    soup = BeautifulSoup(f, 'html.parser').find(kwargs['xml_base_tag'].lower())
+    soup = BeautifulSoup(f, 'html.parser').find(xml_base_tag.lower())
     if not soup:
-        print('WARNING: No XML content was found at tag', kwargs['xml_base_tag'].lower(), f.name)
+        print('WARNING: No XML content was found at tag', xml_base_tag.lower(), f.name)
         return ''
     # remove any specified xml tags
-    for i in kwargs.get('xml_remove_tags', []):
+    for i in xml_remove_tags:
         for t in soup.find_all(i.lower()):
             t.extract()
 
@@ -66,27 +67,25 @@ def chunked_iterator(iterable, n):
 
 
 @lru_cache(maxsize=1024)
-def get_windows(path, **kwargs):
+def get_windows(path, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display, window_length, slide_length):
     """Given a file path return a list of strings from that file"""
-    words = get_words(path, **kwargs)
+    words = get_words(path, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display, )
     buff = []
-    for idx, window in enumerate(ngrams(words, kwargs['window_length'])):
-        if idx % kwargs['slide_length'] == 0:
+    for idx, window in enumerate(ngrams(words, window_length)):
+        if idx % slide_length == 0:
             buff.append(' '.join(window))
     return buff
 
 
 @lru_cache(maxsize=1024)
-def get_window_map(path, **kwargs):
+def get_window_map(path, xml_page_tag, xml_page_attr, encoding, slide_length):
     """Get a mapping from window id to window metadata, including page id"""
-    xml_page_tag = kwargs.get('xml_page_tag')
-    xml_page_attr = kwargs.get('xml_page_attr')
     if not xml_page_tag:
         return
     xml_page_tag = xml_page_tag.lower()
     xml_page_attr = xml_page_attr.lower() if xml_page_attr else None
     # read the text document
-    with open(path, encoding=kwargs['encoding']) as f:
+    with open(path, encoding=encoding) as f:
         f = f.read().lower()
     # split on page breaks using string operations
     pagebreak = f'{randint(0, 2 ** 32)}_$PB$_{randint(0, 2 ** 32)}'.lower()
@@ -120,23 +119,22 @@ def get_window_map(path, **kwargs):
         text = soup.get_text() if soup else ''
         words = text.split()
         for word_index, word in enumerate(words):
-            if word_index and (word_index % kwargs['slide_length'] == 0):
+            if word_index and (word_index % slide_length == 0):
                 window_id += 1
             d[window_id] = page_id
     return d
 
 
-def get_cacheable(*args):
-    """Given a dictionary of kwargs return a dictionary with cacheable values retained"""
-    kwargs = args[0]
-    new_kwargs = {k: v for k, v in kwargs.items() if isinstance(v, Hashable)}
-    if len(args) > 1:
-        for i in args[1:]:
-            new_kwargs.update(i)
-    return new_kwargs
-
-
 def parallel_map(fun, buff, kwargs):
+    process_pool = Pool()
+    f = partial(fun, **kwargs)
+    for _ in process_pool.map(f, buff):
+        pass
+    process_pool.close()
+    process_pool.join()
+
+
+def parallel_map_new(fun, buff, **kwargs):
     process_pool = Pool()
     f = partial(fun, **kwargs)
     for _ in process_pool.map(f, buff):
