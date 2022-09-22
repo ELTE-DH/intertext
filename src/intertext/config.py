@@ -37,6 +37,7 @@ config = {
     'min_sim': 50,
     'excluded_file_ids': tuple(),
     'banish_file_ids': tuple(),
+    'banished_file_ids': tuple(),
     'max_file_sim': None,
     'client': '0.0.1a',
     'update_client': False,
@@ -48,6 +49,7 @@ config = {
     'compute_probabilities': False,
     'bounter_size': 64,
     'display': False,
+    'only_index': None,
 }
 
 
@@ -153,10 +155,9 @@ def process_kwargs(kwargs):
         kwargs['excluded_file_ids'] = tuple({file_idx for file_idx, file in enumerate(infiles) if file in exclude_set})
 
     # get the metadata (if any)
-    kwargs['metadata'] = get_metadata(kwargs)
+    kwargs['metadata'] = get_metadata(kwargs['infiles'], kwargs['metadata'])
 
     # get the focal text index number (if any) of the only file from which matches should be retained
-    kwargs['only_index'] = None
     if kwargs.get('only') is not None:
         kwargs['only_index'] = kwargs['infiles'].index(kwargs['only'])
 
@@ -233,10 +234,14 @@ def process_kwargs(kwargs):
     return kwargs
 
 
-def get_metadata(kwargs):
-    """if the user provided metadata, store it in the kwargs"""
-    metadata = json.load(open(kwargs['metadata'])) if kwargs['metadata'] else {}
-    for i in kwargs['infiles']:
+def get_metadata(infiles, metadata):
+    """if the user provided metadata, load it"""
+    if metadata:
+        with open(metadata) as fh:
+            metadata = json.load(fh)
+    else:
+        metadata = {}
+    for i in infiles:
         basename = Path(i).name
         if basename not in metadata:
             metadata[basename] = {}
@@ -250,35 +255,35 @@ def get_metadata(kwargs):
     return metadata
 
 
-def prepare_output_directories(kwargs):
+def prepare_output_directories(output, cache_location, infiles):
     """Create the folders that store output objects"""
     for i in ('matches', 'scatterplots', 'indices', 'texts'):
-        (kwargs['output'] / 'api' / i).mkdir(parents=True, exist_ok=True)
+        (output / 'api' / i).mkdir(parents=True, exist_ok=True)
 
     for i in ('minhashes',):
-        (kwargs['cache_location'] / i).mkdir(parents=True, exist_ok=True)
+        (cache_location / i).mkdir(parents=True, exist_ok=True)
 
-    for i in range(len(kwargs['infiles'])):
-        (kwargs['output'] / 'api' / 'matches' / str(i)).mkdir(parents=True, exist_ok=True)
+    for i in range(len(infiles)):
+        (output / 'api' / 'matches' / str(i)).mkdir(parents=True, exist_ok=True)
 
 
-def write_config(kwargs):
+def write_config(infiles, inp_metadata, excluded_file_ids, banished_file_ids, output, window_length, slide_length):
     # map each author and title to the files in which that string occurs and save those maps
     metadata = []
-    for idx, i in enumerate(kwargs['infiles']):
-        if i in kwargs.get('excluded_file_ids', []) or i in kwargs.get('banished_file_ids', []):
+    for idx, i in enumerate(infiles):
+        if i in excluded_file_ids or i in banished_file_ids:
             continue
-        file_meta = kwargs['metadata'].get(Path(i).name, {})
+        file_meta = inp_metadata.get(Path(i).name, {})
         metadata.append({
             'id': idx,
             'author': file_meta['author'],
             'title': file_meta['title'],
-            'matches': (kwargs['output'] / 'api' / 'matches' / f'{idx}.json').stat().st_size > 2,
+            'matches': (output / 'api' / 'matches' / f'{idx}.json').stat().st_size > 2,
         })
-    with open(kwargs['output'] / 'api' / 'config.json', 'w') as out:
+    with open(output / 'api' / 'config.json', 'w') as out:
         json.dump({
-            'infiles': kwargs['infiles'],
+            'infiles': infiles,
             'metadata': metadata,
-            'window_size': kwargs['window_length'],
-            'window_slide': kwargs['slide_length'],
+            'window_size': window_length,
+            'window_slide': slide_length,
         }, out, ensure_ascii=False)

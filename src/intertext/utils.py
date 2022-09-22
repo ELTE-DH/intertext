@@ -125,16 +125,7 @@ def get_window_map(path, xml_page_tag, xml_page_attr, encoding, slide_length):
     return d
 
 
-def parallel_map(fun, buff, kwargs):
-    process_pool = Pool()
-    f = partial(fun, **kwargs)
-    for _ in process_pool.map(f, buff):
-        pass
-    process_pool.close()
-    process_pool.join()
-
-
-def parallel_map_new(fun, buff, **kwargs):
+def parallel_map(fun, buff, **kwargs):
     process_pool = Pool()
     f = partial(fun, **kwargs)
     for _ in process_pool.map(f, buff):

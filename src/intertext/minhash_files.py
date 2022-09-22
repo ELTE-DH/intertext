@@ -1,7 +1,7 @@
 import numpy as np
 from vminhash import byte_hashes
 
-from utils import get_windows, ngrams, parallel_map_new
+from utils import get_windows, ngrams, parallel_map
 
 
 # Only this function is public in this file!
@@ -10,11 +10,11 @@ def get_all_hashbands(infiles, cache_location, hasher, encoding, xml_base_tag, x
                       write_hashbands_fun):
     """Generate and save hashbands for each infile"""
     buff = [(idx, i) for idx, i in enumerate(infiles)]
-    parallel_map_new(get_file_hashbands, buff, cache_location=cache_location,
-                     hasher=hasher, encoding=encoding, xml_base_tag=xml_base_tag, xml_remove_tags=xml_remove_tags,
-                     strip_diacritics=strip_diacritics, display=display, window_length=window_length,
-                     slide_length=slide_length, chargram_length=chargram_length, hashband_length=hashband_length,
-                     hashband_step=hashband_step, write_hashbands_fun=write_hashbands_fun)
+    parallel_map(get_file_hashbands, buff, cache_location=cache_location,
+                 hasher=hasher, encoding=encoding, xml_base_tag=xml_base_tag, xml_remove_tags=xml_remove_tags,
+                 strip_diacritics=strip_diacritics, display=display, window_length=window_length,
+                 slide_length=slide_length, chargram_length=chargram_length, hashband_length=hashband_length,
+                 hashband_step=hashband_step, write_hashbands_fun=write_hashbands_fun)
 
 
 def get_file_hashbands(args, cache_location, hasher, encoding, xml_base_tag, xml_remove_tags, strip_diacritics,

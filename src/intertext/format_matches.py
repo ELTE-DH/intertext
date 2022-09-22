@@ -2,49 +2,46 @@ import json
 from uuid import uuid4
 from pathlib import Path
 from copy import deepcopy
-from functools import partial
-from multiprocessing import Pool
 from collections import defaultdict
 
 from bounter import bounter
 
-from utils import get_words, get_windows, get_window_map
+from utils import get_words, get_windows, get_window_map, parallel_map
 
 
 # Only this function is public in this file!
-def format_all_matches(kwargs):
+def format_all_matches(compute_probabilities, bounter_size, metadata, infiles, encoding, xml_base_tag, xml_remove_tags,
+                       strip_diacritics, display, xml_page_tag, xml_page_attr, slide_length, window_length,
+                       max_file_sim, excluded_file_ids, min_sim, output, stream_file_pair_matches_fun,
+                       stream_matching_file_id_pairs_fun):
     """Format the match objects for each infile and store as JSON"""
-    pairs = kwargs['db']['functions']['stream_matching_file_id_pairs']()
+    pairs = stream_matching_file_id_pairs_fun()
     # obtain global counts of terms across corpus
-    parallel_map(format_file_matches, get_word_counts(kwargs), pairs, kwargs)
+    counts = get_word_counts(infiles, compute_probabilities, bounter_size, encoding, xml_base_tag, xml_remove_tags,
+                             strip_diacritics, display)
+    parallel_map(format_file_matches, pairs, counts=counts, metadata=metadata, infiles=infiles, encoding=encoding,
+                 xml_base_tag=xml_base_tag, xml_remove_tags=xml_remove_tags, strip_diacritics=strip_diacritics,
+                 display=display, xml_page_tag=xml_page_tag, xml_page_attr=xml_page_attr, slide_length=slide_length,
+                 window_length=window_length, max_file_sim=max_file_sim, excluded_file_ids=excluded_file_ids,
+                 min_sim=min_sim, output=output, stream_file_pair_matches_fun=stream_file_pair_matches_fun)
 
 
-def parallel_map(fun, counts, buff, kwargs):
-    process_pool = Pool()
-    f = partial(fun, counts, **kwargs)
-    for _ in process_pool.map(f, buff):
-        pass
-    process_pool.close()
-    process_pool.join()
-
-
-def format_file_matches(counts, file_args, **kwargs):
+def format_file_matches(file_args, counts, metadata, infiles, encoding, xml_base_tag,
+                        xml_remove_tags, strip_diacritics, display, xml_page_tag, xml_page_attr, slide_length,
+                        window_length, max_file_sim, excluded_file_ids, min_sim, output, stream_file_pair_matches_fun):
     """'Format the matches for a single file pair"""
     file_id_a, file_id_b = file_args
-    if kwargs.get('excluded_file_ids') and (file_id_a in kwargs['excluded_file_ids'] or
-                                            file_id_b in kwargs['excluded_file_ids']):
+    if excluded_file_ids and (file_id_a in excluded_file_ids or file_id_b in excluded_file_ids):
         return
-    pair_matches = list(kwargs['db']['functions']['stream_file_pair_matches'](file_id_a, file_id_b))
+    pair_matches = list(stream_file_pair_matches_fun(file_id_a, file_id_b))
     if pair_matches:
         # check to see if this file pair has >= max allowed similarity
-        a_windows = get_windows(kwargs['infiles'][file_id_a], kwargs['encoding'], kwargs['xml_base_tag'],
-                                kwargs['xml_remove_tags'], kwargs['strip_diacritics'], kwargs['display'],
-                                kwargs['window_length'], kwargs['slide_length'])
-        b_windows = get_windows(kwargs['infiles'][file_id_b], kwargs['encoding'], kwargs['xml_base_tag'],
-                                kwargs['xml_remove_tags'], kwargs['strip_diacritics'], kwargs['display'],
-                                kwargs['window_length'], kwargs['slide_length'])
-        if kwargs['max_file_sim'] and ((len(pair_matches) > len(a_windows) * kwargs['max_file_sim']) or
-                                       (len(pair_matches) > len(b_windows) * kwargs['max_file_sim'])):
+        a_windows = get_windows(infiles[file_id_a], encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display,
+                                window_length, slide_length)
+        b_windows = get_windows(infiles[file_id_b], encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display,
+                                window_length, slide_length)
+        if max_file_sim and ((len(pair_matches) > len(a_windows) * max_file_sim) or
+                             (len(pair_matches) > len(b_windows) * max_file_sim)):
             print(' * file pair', *file_args, 'has >= max_file_sim; skipping!')
             return
         # cluster the matches so sequential matching windows are grouped into a single match
@@ -64,49 +61,48 @@ def format_file_matches(counts, file_args, **kwargs):
                             cluster['sim'].append(d[a_i][b_i])
                 if cluster['a'] and cluster['b']:
                     sim = int(sum(cluster['sim']) / len(cluster['sim']))
-                    if sim >= kwargs['min_sim']:
+                    if sim >= min_sim:
                         clusters.append({
                             'a': sorted(cluster['a']),
                             'b': sorted(cluster['b']),
                             'sim': sim,
                         })
         # format the matches, then save into both file_id_a and file_id_b directories
-        formatted = format_matches(file_id_a, file_id_b, clusters, counts, **kwargs)
+        formatted = format_matches(file_id_a, file_id_b, clusters, counts, metadata, infiles, encoding, xml_base_tag,
+                                   xml_remove_tags, strip_diacritics, xml_page_tag, xml_page_attr,slide_length,
+                                   window_length)
         for i in (file_id_a, file_id_b):
-            out_dir = kwargs['output'] / 'api' / 'matches' / str(i)
+            out_dir = output / 'api' / 'matches' / str(i)
             with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w') as out:
                 json.dump(formatted, out, ensure_ascii=False)
 
 
-def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
+def format_matches(file_id_a, file_id_b, clusters, counts, metadata, infiles, encoding, xml_base_tag, xml_remove_tags,
+                   strip_diacritics, xml_page_tag, xml_page_attr,slide_length, window_length):
     """Given integer file ids and clusters [{a: [], b: [], sim: []}] format matches for display"""
-    file_id_a, file_id_b, clusters = order_match_pair(file_id_a, file_id_b, clusters, **kwargs)
-    path_a = Path(kwargs['infiles'][file_id_a])
-    path_b = Path(kwargs['infiles'][file_id_b])
+    file_id_a, file_id_b, clusters = order_match_pair(file_id_a, file_id_b, clusters, metadata, infiles)
+    path_a = Path(infiles[file_id_a])
+    path_b = Path(infiles[file_id_b])
     bn_a = path_a.name
     bn_b = path_b.name
-    a_meta = kwargs.get('metadata', {}).get(bn_a, {})
-    b_meta = kwargs.get('metadata', {}).get(bn_b, {})
+    a_meta = metadata.get(bn_a, {})
+    b_meta = metadata.get(bn_b, {})
     # format the matches
-    a_words = get_words(path_a, kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
-                        kwargs['strip_diacritics'], True)
-    b_words = get_words(path_b, kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
-                        kwargs['strip_diacritics'], True)
+    a_words = get_words(path_a, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, True)
+    b_words = get_words(path_b, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, True)
     formatted = []
     # fetch a mapping from window id to $PAGE elements if necessary
     a_windows_to_page = None
     b_windows_to_page = None
     try:
-        a_windows_to_page = get_window_map(path_a,  kwargs['xml_page_tag'], kwargs['xml_page_attr'], kwargs['encoding'],
-                                           kwargs['slide_length'])
-        b_windows_to_page = get_window_map(path_b, kwargs['xml_page_tag'], kwargs['xml_page_attr'], kwargs['encoding'],
-                                           kwargs['slide_length'])
+        a_windows_to_page = get_window_map(path_a, xml_page_tag, xml_page_attr, encoding, slide_length)
+        b_windows_to_page = get_window_map(path_b, xml_page_tag, xml_page_attr, encoding, slide_length)
     except:
         print(' * unable to retrieve mapping from window to page id')
     # each member c in clusters is a dictionary {a: b: } where values contain the match windows
     for c in clusters:
-        a_strings = get_match_strings(a_words, c['a'], kwargs['slide_length'], kwargs['window_length'])
-        b_strings = get_match_strings(b_words, c['b'], kwargs['slide_length'], kwargs['window_length'])
+        a_strings = get_match_strings(a_words, c['a'], slide_length, window_length)
+        b_strings = get_match_strings(b_words, c['b'], slide_length, window_length)
         formatted.append({
             '_id': str(uuid4()),
             'similarity': c['sim'],
@@ -117,8 +113,8 @@ def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
             'target_segment_ids': c['b'],
             'source_filename': bn_a,
             'target_filename': bn_b,
-            'source_file_path': kwargs['infiles'][file_id_a],
-            'target_file_path': kwargs['infiles'][file_id_b],
+            'source_file_path': infiles[file_id_a],
+            'target_file_path': infiles[file_id_b],
             'source_prematch': a_strings['prematch'],
             'target_prematch': b_strings['prematch'],
             'source_match': a_strings['match'],
@@ -131,24 +127,24 @@ def format_matches(file_id_a, file_id_b, clusters, counts, **kwargs):
             'target_author': b_meta.get('author', ''),
             'source_title': a_meta.get('title', ''),
             'target_title': b_meta.get('title', ''),
-            'source_url': get_url(a_meta, a_windows_to_page, c['a'], **kwargs),
-            'target_url': get_url(b_meta, b_windows_to_page, c['b'], **kwargs),
+            'source_url': get_url(a_meta, a_windows_to_page, c['a'], xml_page_tag),
+            'target_url': get_url(b_meta, b_windows_to_page, c['b'], xml_page_tag),
         })
     return formatted
 
 
-def get_url(meta, windows_to_page, windows, **kwargs):
+def get_url(meta, windows_to_page, windows, xml_page_tag):
     """Return the url to the first of the current windows"""
     ret = meta.get('url', '')
-    if kwargs.get('xml_page_tag'):
+    if xml_page_tag:
         ret = ret.replace('$PAGE_ID', windows_to_page.get(windows[0], ''))
     return ret
 
 
-def order_match_pair(file_id_a, file_id_b, clusters, **kwargs):
+def order_match_pair(file_id_a, file_id_b, clusters, metadata, infiles):
     """Set file id a to the previously published file (if relevant)"""
-    a_meta = kwargs.get('metadata', {}).get(Path(kwargs['infiles'][file_id_a]).name, {})
-    b_meta = kwargs.get('metadata', {}).get(Path(kwargs['infiles'][file_id_b]).name, {})
+    a_meta = metadata.get(Path(infiles[file_id_a]).name, {})
+    b_meta = metadata.get(Path(infiles[file_id_b]).name, {})
     if a_meta and b_meta and \
             a_meta.get('year') and b_meta.get('year') and \
             b_meta.get('year') < a_meta.get('year'):
@@ -179,14 +175,14 @@ def get_sequences(arg):
     return sequences
 
 
-def get_word_counts(kwargs):
+def get_word_counts(infiles, compute_probabilities, bounter_size, encoding, xml_base_tag, xml_remove_tags,
+                    strip_diacritics, display):
     """Return a bounter.bounter instance if user requested string likelihoods, else None"""
-    if kwargs.get('compute_probabilities'):
+    if compute_probabilities:
         print(' * computing word counts')
-        counts = bounter(size_mb=int(kwargs.get('bounter_size')))
-        for i in kwargs['infiles']:
-            words = get_words(i, kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
-                              kwargs['strip_diacritics'], kwargs['display'])
+        counts = bounter(size_mb=bounter_size)
+        for i in infiles:
+            words = get_words(i, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display)
             counts.update(words)
         print(' * finished computing word counts')
         return counts

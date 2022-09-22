@@ -1,18 +1,19 @@
 from difflib import SequenceMatcher
 
-from utils import get_windows, parallel_map_new
+from utils import get_windows, parallel_map
 
 
+# Only this function is public in this file!
 def validate_all_matches(infiles, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display, window_length,
                          slide_length, min_sim, stream_candidate_file_id_pairs_fun,
                          stream_matching_candidate_windows_fun, write_matches_fun):
     """Run match validations and yield [a_file,b_file,a_window,b_window]"""
     pairs = stream_candidate_file_id_pairs_fun()
-    parallel_map_new(validate_file_matches, pairs, infiles=infiles, encoding=encoding, xml_base_tag=xml_base_tag,
-                     xml_remove_tags=xml_remove_tags, strip_diacritics=strip_diacritics, display=display,
-                     window_length=window_length, slide_length=slide_length, min_sim=min_sim,
-                     stream_matching_candidate_windows_fun=stream_matching_candidate_windows_fun,
-                     write_matches_fun=write_matches_fun)
+    parallel_map(validate_file_matches, pairs, infiles=infiles, encoding=encoding, xml_base_tag=xml_base_tag,
+                 xml_remove_tags=xml_remove_tags, strip_diacritics=strip_diacritics, display=display,
+                 window_length=window_length, slide_length=slide_length, min_sim=min_sim,
+                 stream_matching_candidate_windows_fun=stream_matching_candidate_windows_fun,
+                 write_matches_fun=write_matches_fun)
 
 
 def validate_file_matches(file_args, infiles, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display,

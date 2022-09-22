@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from collections import defaultdict
 
 from networkx import all_pairs_shortest_path_length, Graph
@@ -34,7 +33,7 @@ def process_texts(kwargs):
     kwargs = process_kwargs(kwargs)
 
     # create the output directories where results will be stored
-    prepare_output_directories(kwargs)
+    prepare_output_directories(kwargs['output'], kwargs['cache_location'], kwargs['infiles'])
 
     # update the metadata and exit if requested
     if not kwargs.get('update_metadata'):
@@ -56,7 +55,10 @@ def process_texts(kwargs):
 
         # find all hashbands that have multiple distict file_ids
         print(' * identifying match candidates')
-        get_all_match_candidates(kwargs)
+        get_all_match_candidates(kwargs['only_index'], kwargs['write_frequency'],
+                                 kwargs['db']['functions']['write_candidates'],
+                                 kwargs['db']['functions']['stream_hashbands'], kwargs['batch_size'],
+                                 kwargs['verbose'])
 
         # validate matches from among the candidates
         print(' * validating matches')
@@ -70,42 +72,52 @@ def process_texts(kwargs):
 
     # banish matches if necessary
     if kwargs['banish_glob']:
-        banish_matches(kwargs)
+        banish_matches(kwargs['banish_glob'], kwargs['banished_file_ids'], kwargs['banish_distance'],
+                       kwargs['delete_matches_fun'], kwargs['stream_file_pair_matches_fun'],
+                       kwargs['stream_matching_file_id_pairs_fun'])
 
     # format matches into JSON for client consumption
     print(' * formatting matches')
-    format_all_matches(kwargs)
+    format_all_matches(kwargs['compute_probabilities'], kwargs['bounter_size'], kwargs['metadata'], kwargs['infiles'],
+                       kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
+                       kwargs['strip_diacritics'], kwargs['display'], kwargs['xml_page_tag'], kwargs['xml_page_attr'],
+                       kwargs['slide_length'], kwargs['window_length'], kwargs['max_file_sim'],
+                       kwargs['excluded_file_ids'], kwargs['min_sim'], kwargs['output'],
+                       kwargs['db']['functions']['stream_file_pair_matches'],
+                       kwargs['db']['functions']['stream_matching_file_id_pairs'])
 
     # combine all matches into a single match object
     print(' * formatting JSON outputs')
-    create_all_match_json(kwargs)
+    create_all_match_json(kwargs['output'], kwargs['compute_probabilities'])
 
     # write the output config file
     print(' * writing config')
-    write_config(kwargs)
+    write_config(kwargs['infiles'], kwargs['metadata'], kwargs['excluded_file_ids'], kwargs['banished_file_ids'],
+                 kwargs['output'], kwargs['window_length'], kwargs['slide_length'])
 
     # copy input texts into outputs
     print(' * preparing text reader data')
-    create_reader_data(kwargs)
+    create_reader_data(kwargs['infiles'], kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
+                       kwargs['strip_diacritics'], kwargs['output'])
 
 
-def create_reader_data(kwargs):
+def create_reader_data(infiles, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, output):
     """Create the data to be used in the reader view"""
-    for idx, i in enumerate(kwargs['infiles']):
-        words = get_words(i, kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
-                          kwargs['strip_diacritics'], True)
-        with open(Path(kwargs['output']) / 'api' / 'texts' / f'{idx}.json', 'w') as out:
+    for idx, i in enumerate(infiles):
+        words = get_words(i, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, True)
+        with open(output / 'api' / 'texts' / f'{idx}.json', 'w') as out:
             json.dump(words, out, ensure_ascii=False)
 
 
-def banish_matches(kwargs):
+def banish_matches(banish_glob, banished_file_ids, banish_distance, delete_matches_fun, stream_file_pair_matches_fun,
+                   stream_matching_file_id_pairs_fun):
     """Delete banished matches from the db"""
-    if kwargs['banish_glob']:
+    if banish_glob:
         print(' * banishing matches')
         g = Graph()
-        for file_id_a, file_id_b in kwargs['db']['functions']['stream_matching_file_id_pairs']():
+        for file_id_a, file_id_b in stream_matching_file_id_pairs_fun():
             for _, _, window_a, window_b, sim \
-                    in kwargs['db']['functions']['stream_file_pair_matches'](file_id_a, file_id_b):
+                    in stream_file_pair_matches_fun(file_id_a, file_id_b):
                 s = f'{file_id_a}.{window_a}'
                 t = f'{file_id_b}.{window_b}'
                 g.add_edge(s, t)
@@ -113,14 +125,14 @@ def banish_matches(kwargs):
         banished_dict = defaultdict(set)
         distances = dict(all_pairs_shortest_path_length(g))
         for i in list(connected_components(g)):
-            banished_ids = [j for j in i if int(j.split('.')[0]) in kwargs['banished_file_ids']]
+            banished_ids = [j for j in i if int(j.split('.')[0]) in banished_file_ids]
             # search up to maximum path length between nodes so nodes linked to a banished node are removed
             for j in i:
-                if any(distances[j][k] < kwargs['banish_distance'] for k in banished_ids):
+                if any(distances[j][k] < banish_distance for k in banished_ids):
                     file_id, window_id = j.split('.')
                     banished_dict[file_id].add(window_id)
         # remove the banished file_id, window_id tuples from the db
-        kwargs['db']['functions']['delete_matches'](banished_dict)
+        delete_matches_fun(banished_dict)
 
 
 if __name__ == '__main__':
