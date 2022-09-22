@@ -18,9 +18,6 @@ config = {
     'exclude_glob': '',
     'output': Path('output'),
     'metadata': {},
-    'encoding': 'utf8',
-    'xml_base_tag': None,
-    'xml_remove_tags': tuple(),
     'xml_page_tag': None,
     'xml_page_attr': None,
     'batch_size': 10 ** 5,
@@ -63,8 +60,6 @@ def parse():
                         help='path to a glob of text files to exclude from matches', required=False)
     parser.add_argument('--metadata', '-m', type=Path, default=config['metadata'],
                         help='path to a JSON metadata file (see README)', required=False)
-    parser.add_argument('--encoding', '-e', type=str, default=config['encoding'], help='the encoding of infiles',
-                        required=False)
     parser.add_argument('--window_length', '-w', type=int, default=config['window_length'],
                         help='the length of windows when processing files (see README)', required=False)
     parser.add_argument('--hashband_length', '-hb', type=int, default=config['hashband_length'],
@@ -85,10 +80,6 @@ def parse():
                         help='the maximum similarity between two files such that matches are retained', required=False)
     parser.add_argument('--output', '-o', type=Path, default=config['output'], help='the output location',
                         required=False)
-    parser.add_argument('--xml_base_tag', type=str, default=config['xml_base_tag'],
-                        help='if specified, text within this parent tag will be parsed', required=False)
-    parser.add_argument('--xml_remove_tags', default=config['xml_remove_tags'],
-                        help='if specified, text within these tags will be removed', nargs='+', required=False)
     parser.add_argument('--xml_page_tag', type=str, default=config['xml_page_tag'],
                         help='if specified, urls can reference content within this tag')
     parser.add_argument('--xml_page_attr', type=str, default=config['xml_page_attr'],
@@ -99,7 +90,6 @@ def parse():
     parser.add_argument('--verbose', '-v', default=config['verbose'],
                         help='if specified, the intertext process will log more operations', required=False,
                         action='store_true')
-    parser.add_argument('--db', default=config['db'], help='specify sqlite to use a sqlite db', required=False)
     parser.add_argument('--only', default=config['only'],
                         help='only retain matches that include text from the specified file path', required=False)
     parser.add_argument('--update_metadata', default=config['update_metadata'],
@@ -164,8 +154,6 @@ def process_kwargs(kwargs):
     cache_location = Path('.') / 'cache'
     kwargs['cache_location'] = cache_location
 
-    if kwargs.get('xml_remove_tags'):
-        kwargs['xml_remove_tags'] = tuple(kwargs['xml_remove_tags'])
     copy_client(client_location, kwargs['output'])
 
     verbose = kwargs.get('verbose')

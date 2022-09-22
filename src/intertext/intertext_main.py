@@ -47,8 +47,7 @@ def process_texts(kwargs):
 
         # minhash files & store hashbands in db
         print(' * creating minhashes')
-        get_all_hashbands(kwargs['infiles'], kwargs['cache_location'], kwargs['hasher'], kwargs['encoding'],
-                          kwargs['xml_base_tag'], kwargs['xml_remove_tags'], kwargs['strip_diacritics'],
+        get_all_hashbands(kwargs['infiles'], kwargs['cache_location'], kwargs['hasher'], kwargs['strip_diacritics'],
                           kwargs['display'], kwargs['window_length'], kwargs['slide_length'], kwargs['chargram_length'],
                           kwargs['hashband_length'], kwargs['hashband_step'],
                           kwargs['db']['functions']['write_hashbands'])
@@ -62,8 +61,7 @@ def process_texts(kwargs):
 
         # validate matches from among the candidates
         print(' * validating matches')
-        validate_all_matches(kwargs['infiles'], kwargs['encoding'], kwargs['xml_base_tag'],
-                             kwargs['xml_remove_tags'], kwargs['strip_diacritics'], kwargs['display'],
+        validate_all_matches(kwargs['infiles'], kwargs['strip_diacritics'], kwargs['display'],
                              kwargs['window_length'], kwargs['slide_length'],
                              kwargs['min_sim'],
                              kwargs['db']['functions']['stream_candidate_file_id_pairs'],
@@ -79,7 +77,6 @@ def process_texts(kwargs):
     # format matches into JSON for client consumption
     print(' * formatting matches')
     format_all_matches(kwargs['compute_probabilities'], kwargs['bounter_size'], kwargs['metadata'], kwargs['infiles'],
-                       kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
                        kwargs['strip_diacritics'], kwargs['display'], kwargs['xml_page_tag'], kwargs['xml_page_attr'],
                        kwargs['slide_length'], kwargs['window_length'], kwargs['max_file_sim'],
                        kwargs['excluded_file_ids'], kwargs['min_sim'], kwargs['output'],
@@ -97,14 +94,13 @@ def process_texts(kwargs):
 
     # copy input texts into outputs
     print(' * preparing text reader data')
-    create_reader_data(kwargs['infiles'], kwargs['encoding'], kwargs['xml_base_tag'], kwargs['xml_remove_tags'],
-                       kwargs['strip_diacritics'], kwargs['output'])
+    create_reader_data(kwargs['infiles'], kwargs['strip_diacritics'], kwargs['output'])
 
 
-def create_reader_data(infiles, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, output):
+def create_reader_data(infiles, strip_diacritics, output):
     """Create the data to be used in the reader view"""
     for idx, i in enumerate(infiles):
-        words = get_words(i, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, True)
+        words = get_words(i, strip_diacritics, True)
         with open(output / 'api' / 'texts' / f'{idx}.json', 'w') as out:
             json.dump(words, out, ensure_ascii=False)
 

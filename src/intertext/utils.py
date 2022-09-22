@@ -1,5 +1,4 @@
 from random import randint
-from typing import Hashable
 from multiprocessing import Pool
 from itertools import islice, tee, chain
 from functools import lru_cache, partial
@@ -10,19 +9,17 @@ from unidecode import unidecode
 
 
 @lru_cache(maxsize=1024)
-def get_words(path, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display):
+def get_words(path, strip_diacritics, display):
     """Given a file path return a list of strings from that file"""
-
-    with open(path, encoding=encoding) as f:
-        if xml_base_tag:
-            f = get_soup_text(f, xml_base_tag, xml_remove_tags)
-        else:
-            f = f.read()
+    with open(path, encoding='UTF-8') as f:
+        f = f.read()
     # optionally remove diacritics
     if strip_diacritics and not display:
         f = unidecode(f)
+    if not display:
+        return f.split()
     # optionally format the list of words for display in the web viewer
-    if display:
+    else:
         lines = f.replace('\n', ' __NEWLINE__ ').split()
         formatted = []
         for idx, i in enumerate(lines):
@@ -33,22 +30,6 @@ def get_words(path, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, d
             else:
                 formatted.append(i)
         return formatted
-    else:
-        return f.split()
-
-
-def get_soup_text(f, xml_base_tag, xml_remove_tags):
-    """Return a soup object given a _io.TextIOWrapper object"""
-    soup = BeautifulSoup(f, 'html.parser').find(xml_base_tag.lower())
-    if not soup:
-        print('WARNING: No XML content was found at tag', xml_base_tag.lower(), f.name)
-        return ''
-    # remove any specified xml tags
-    for i in xml_remove_tags:
-        for t in soup.find_all(i.lower()):
-            t.extract()
-
-    return soup.get_text() if soup else ''
 
 
 def ngrams(it, n):
@@ -67,9 +48,9 @@ def chunked_iterator(iterable, n):
 
 
 @lru_cache(maxsize=1024)
-def get_windows(path, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display, window_length, slide_length):
+def get_windows(path, strip_diacritics, display, window_length, slide_length):
     """Given a file path return a list of strings from that file"""
-    words = get_words(path, encoding, xml_base_tag, xml_remove_tags, strip_diacritics, display, )
+    words = get_words(path, strip_diacritics, display)
     buff = []
     for idx, window in enumerate(ngrams(words, window_length)):
         if idx % slide_length == 0:
@@ -78,14 +59,12 @@ def get_windows(path, encoding, xml_base_tag, xml_remove_tags, strip_diacritics,
 
 
 @lru_cache(maxsize=1024)
-def get_window_map(path, xml_page_tag, xml_page_attr, encoding, slide_length):
+def get_window_map(path, xml_page_tag, xml_page_attr, slide_length):
     """Get a mapping from window id to window metadata, including page id"""
-    if not xml_page_tag:
-        return
     xml_page_tag = xml_page_tag.lower()
     xml_page_attr = xml_page_attr.lower() if xml_page_attr else None
     # read the text document
-    with open(path, encoding=encoding) as f:
+    with open(path, encoding='UTF-8') as f:
         f = f.read().lower()
     # split on page breaks using string operations
     pagebreak = f'{randint(0, 2 ** 32)}_$PB$_{randint(0, 2 ** 32)}'.lower()
