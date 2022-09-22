@@ -6,18 +6,18 @@ from utils import chunked_iterator
 
 
 # Only this function is public in this file!
-def get_all_match_candidates(only_index, write_frequency, write_candidates_fun, stream_hashbands_fun, batch_size,
+def get_all_match_candidates(only_index, write_frequency, cache_db, batch_size,
                              verbose):
     """Find all hashbands that have multiple distinct file_ids and save as match candidates"""
     # the hashbands table is our largest data artifact - paginate in blocks
-    for chunk in chunked_iterator(stream_hashbands_fun(), batch_size):
-        process_candidate_hashbands(list(chunk), only_index, write_frequency, write_candidates_fun, verbose)
+    for chunk in chunked_iterator(cache_db.stream_hashbands(), batch_size):
+        process_candidate_hashbands(list(chunk), only_index, write_frequency, cache_db, verbose)
 
 
-def process_candidate_hashbands(inp_hashbands, only_index, write_frequency, write_candidates_fun, verbose):
+def process_candidate_hashbands(inp_hashbands, only_index, write_frequency, cache_db, verbose):
     """Given a set of hashbands, subdivide into processes to find match candidates for each"""
     if verbose:
-        print(' * processing match candidate block')
+        print(' * processing a match candidate block')
     pool = Pool()
     # Subdivide list `l` into units `n` long lists
     hashbands = [list(chunk) for chunk in chunked_iterator(inp_hashbands, len(inp_hashbands) // cpu_count())]
@@ -26,10 +26,10 @@ def process_candidate_hashbands(inp_hashbands, only_index, write_frequency, writ
     for idx, i in enumerate(pool.map(fun, hashbands)):
         writes.update(i)
         if len(writes) >= write_frequency or idx == len(hashbands) - 1:
-            write_candidates_fun(writes)
+            cache_db.write_candidates(writes)
             writes = set()
     if writes:
-        write_candidates_fun(writes)
+        cache_db.write_candidates(writes)
     pool.close()
     pool.join()
 

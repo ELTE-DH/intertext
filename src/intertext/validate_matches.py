@@ -5,22 +5,19 @@ from utils import get_windows, parallel_map
 
 # Only this function is public in this file!
 def validate_all_matches(infiles, strip_diacritics, display, window_length,
-                         slide_length, min_sim, stream_candidate_file_id_pairs_fun,
-                         stream_matching_candidate_windows_fun, write_matches_fun):
+                         slide_length, min_sim, cache_db):
     """Run match validations and yield [a_file,b_file,a_window,b_window]"""
-    pairs = stream_candidate_file_id_pairs_fun(infiles)
+    pairs = cache_db.stream_candidate_file_id_pairs(infiles)
     parallel_map(validate_file_matches, pairs, strip_diacritics=strip_diacritics, display=display,
-                 window_length=window_length, slide_length=slide_length, min_sim=min_sim,
-                 stream_matching_candidate_windows_fun=stream_matching_candidate_windows_fun,
-                 write_matches_fun=write_matches_fun)
+                 window_length=window_length, slide_length=slide_length, min_sim=min_sim, cache_db=cache_db)
 
 
-def validate_file_matches(file_args, strip_diacritics, display, window_length, slide_length,
-                          min_sim, stream_matching_candidate_windows_fun, write_matches_fun):
+def validate_file_matches(file_args, strip_diacritics, display, window_length, slide_length, min_sim, cache_db):
     """Validate the matches for a single file pair and return [a_file,b_file,a_window,b_window]"""
     file_path_a, file_path_b, file_id_a, file_id_b = file_args
     matches = []
-    for file_id_a, file_id_b, window_id_a, window_id_b in stream_matching_candidate_windows_fun(file_id_a, file_id_b):
+    for file_id_a, file_id_b, window_id_a, window_id_b \
+            in cache_db.stream_matching_candidate_windows(file_id_a, file_id_b):
         file_b_windows = list(get_windows(file_path_b, strip_diacritics, display, window_length, slide_length))
         file_a_windows = list(get_windows(file_path_a, strip_diacritics, display, window_length, slide_length))
         try:
@@ -39,4 +36,4 @@ def validate_file_matches(file_args, strip_diacritics, display, window_length, s
             if a_singles < (window_length * 0.75) and b_singles < (window_length * 0.75):
                 matches.append([file_id_a, file_id_b, window_id_a, window_id_b, int(sim)])
     if matches:
-        write_matches_fun(matches)
+        cache_db.write_matches(matches)

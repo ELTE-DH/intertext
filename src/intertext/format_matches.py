@@ -10,24 +10,23 @@ from utils import get_words, get_windows, get_window_map, parallel_map
 # Only this function is public in this file!
 def format_all_matches(counts, metadata, infiles, strip_diacritics, display, xml_page_tag,
                        xml_page_attr, slide_length, window_length, max_file_sim, excluded_file_ids, min_sim,
-                       output, stream_file_pair_matches_fun, stream_matching_file_id_pairs_fun):
+                       output, cache_db):
     """Format the match objects for each infile and store as JSON"""
-    pairs = stream_matching_file_id_pairs_fun()
+    pairs = cache_db.stream_matching_file_id_pairs()
     parallel_map(format_file_matches, pairs, counts=counts, metadata=metadata, infiles=infiles,
                  strip_diacritics=strip_diacritics, display=display, xml_page_tag=xml_page_tag,
                  xml_page_attr=xml_page_attr, slide_length=slide_length, window_length=window_length,
                  max_file_sim=max_file_sim, excluded_file_ids=excluded_file_ids, min_sim=min_sim, output=output,
-                 stream_file_pair_matches_fun=stream_file_pair_matches_fun)
+                 cache_db=cache_db)
 
 
 def format_file_matches(file_args, counts, metadata, infiles, strip_diacritics, display, xml_page_tag, xml_page_attr,
-                        slide_length, window_length, max_file_sim, excluded_file_ids, min_sim, output,
-                        stream_file_pair_matches_fun):
+                        slide_length, window_length, max_file_sim, excluded_file_ids, min_sim, output, cache_db):
     """'Format the matches for a single file pair"""
     file_id_a, file_id_b = file_args
     if excluded_file_ids and (file_id_a in excluded_file_ids or file_id_b in excluded_file_ids):
         return
-    pair_matches = list(stream_file_pair_matches_fun(file_id_a, file_id_b))
+    pair_matches = list(cache_db.stream_file_pair_matches(file_id_a, file_id_b))
     if pair_matches:
         # check to see if this file pair has >= max allowed similarity
         a_windows = get_windows(infiles[file_id_a], strip_diacritics, display, window_length, slide_length)

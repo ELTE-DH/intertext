@@ -1,13 +1,8 @@
 import glob
 import json
-import shutil
 import argparse
 from pathlib import Path
-from functools import partial
-
-from db_sql import write_hashbands_sql, write_candidates_sql, write_matches_sql, delete_matches_sql, \
-    stream_hashbands_sql, stream_candidate_file_id_pairs_sql, stream_matching_file_id_pairs_sql, \
-    stream_matching_candidate_windows_sql, stream_file_pair_matches_sql, clear_db_sql, initialize_db_sql
+from shutil import rmtree, copytree
 
 from vminhash import VectorizedMinHash
 
@@ -17,6 +12,7 @@ config = {
     'banish_glob': '',
     'exclude_glob': '',
     'output': Path('output'),
+    'cache_location': Path('cache'),
     'metadata': {},
     'xml_page_tag': None,
     'xml_page_attr': None,
@@ -103,15 +99,6 @@ def parse():
         return config
 
 
-def copy_client(client_dir, output_dir):
-    """Copy the client to the output directory"""
-    # copy the `build` directory to the output directory
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
-    # copy the web client
-    shutil.copytree(client_dir / 'build', output_dir)
-
-
 def process_kwargs(kwargs):
     """Return a list of the infiles to be processed"""
 
@@ -149,39 +136,12 @@ def process_kwargs(kwargs):
         kwargs['only_index'] = kwargs['infiles'].index(kwargs['only'])
 
     kwargs['hasher'] = VectorizedMinHash(n_perm=256)
-    source_location = Path(__file__).parent
-    client_location = source_location / 'client'
-    cache_location = Path('.') / 'cache'
-    kwargs['cache_location'] = cache_location
 
-    copy_client(client_location, kwargs['output'])
-
-    verbose = kwargs.get('verbose')
-    if kwargs['db'] == 'sqlite':
-        kwargs['db'] = {}
-        kwargs['db']['functions'] = {}
-        kwargs['db']['functions']['clear_db'] = clear_db_sql
-        kwargs['db']['functions']['initialize_db'] = partial(initialize_db_sql, cache_location=cache_location)
-        kwargs['db']['functions']['write_hashbands'] = partial(write_hashbands_sql, verbose=verbose,
-                                                               cache_location=cache_location)
-        kwargs['db']['functions']['write_candidates'] = partial(write_candidates_sql, verbose=verbose,
-                                                                cache_location=cache_location)
-        kwargs['db']['functions']['write_matches'] = partial(write_matches_sql, verbose=verbose,
-                                                             cache_location=cache_location)
-        kwargs['db']['functions']['delete_matches'] = partial(delete_matches_sql, verbose=verbose,
-                                                              cache_location=cache_location)
-        kwargs['db']['functions']['stream_hashbands'] = partial(stream_hashbands_sql, verbose=verbose,
-                                                                cache_location=cache_location)
-        kwargs['db']['functions']['stream_candidate_file_id_pairs'] = partial(stream_candidate_file_id_pairs_sql,
-                                                                              verbose=verbose,
-                                                                              cache_location=cache_location)
-        kwargs['db']['functions']['stream_matching_file_id_pairs'] = partial(stream_matching_file_id_pairs_sql,
-                                                                             cache_location=cache_location)
-        kwargs['db']['functions']['stream_matching_candidate_windows'] = partial(stream_matching_candidate_windows_sql,
-                                                                                 verbose=verbose,
-                                                                                 cache_location=cache_location)
-        kwargs['db']['functions']['stream_file_pair_matches'] = partial(stream_file_pair_matches_sql,
-                                                                        cache_location=cache_location)
+    # Copy the client to the output directory
+    if kwargs['output'].exists():
+        rmtree(kwargs['output'])
+    # copy the `build` directory to the output directory
+    copytree(Path(__file__).parent / 'client' / 'build', kwargs['output'])
 
     # return the processed kwargs
     return kwargs

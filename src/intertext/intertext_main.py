@@ -13,6 +13,7 @@ from json_output import create_all_match_json
 from validate_matches import validate_all_matches
 from match_candidates import get_all_match_candidates
 from config import parse, process_kwargs, prepare_output_directories, write_config
+from db_sql import SQLCache
 
 """
 TODO:
@@ -38,42 +39,31 @@ def process_texts(kwargs):
 
     # update the metadata and exit if requested
     if not kwargs.get('update_metadata'):
-        # remove extant db and prepare output directories
-        kwargs['db']['functions']['clear_db']()
-
         # create the db
-        kwargs['db']['functions']['initialize_db']('hashbands')
-        kwargs['db']['functions']['initialize_db']('candidates')
-        kwargs['db']['functions']['initialize_db']('matches')
+        cache_db = SQLCache('cache', initialize=True, db_dir=kwargs['cache_location'], verbose=kwargs['verbose'])
 
         # minhash files & store hashbands in db
         print(' * creating minhashes')
         get_all_hashbands(kwargs['infiles'], kwargs['cache_location'], kwargs['hasher'], kwargs['strip_diacritics'],
                           kwargs['display'], kwargs['window_length'], kwargs['slide_length'], kwargs['chargram_length'],
                           kwargs['hashband_length'], kwargs['hashband_step'],
-                          kwargs['db']['functions']['write_hashbands'])
+                          cache_db)
 
         # find all hashbands that have multiple distict file_ids
         print(' * identifying match candidates')
-        get_all_match_candidates(kwargs['only_index'], kwargs['write_frequency'],
-                                 kwargs['db']['functions']['write_candidates'],
-                                 kwargs['db']['functions']['stream_hashbands'], kwargs['batch_size'],
+        get_all_match_candidates(kwargs['only_index'], kwargs['write_frequency'], cache_db, kwargs['batch_size'],
                                  kwargs['verbose'])
 
         # validate matches from among the candidates
         print(' * validating matches')
-        validate_all_matches(kwargs['infiles'], kwargs['strip_diacritics'], kwargs['display'],
-                             kwargs['window_length'], kwargs['slide_length'],
-                             kwargs['min_sim'],
-                             kwargs['db']['functions']['stream_candidate_file_id_pairs'],
-                             kwargs['db']['functions']['stream_matching_candidate_windows'],
-                             kwargs['db']['functions']['write_matches'])
+        validate_all_matches(kwargs['infiles'], kwargs['strip_diacritics'], kwargs['display'], kwargs['window_length'],
+                             kwargs['slide_length'], kwargs['min_sim'], cache_db)
+    else:
+        cache_db = SQLCache('cache', db_dir=kwargs['cache_location'], verbose=kwargs['verbose'])
 
     # banish matches if necessary
     if kwargs['banish_glob']:
-        banish_matches(kwargs['banish_glob'], kwargs['banished_file_ids'], kwargs['banish_distance'],
-                       kwargs['delete_matches_fun'], kwargs['stream_file_pair_matches_fun'],
-                       kwargs['stream_matching_file_id_pairs_fun'])
+        banish_matches(kwargs['banish_glob'], kwargs['banished_file_ids'], kwargs['banish_distance'], cache_db)
 
     # format matches into JSON for client consumption
     print(' * formatting matches')
@@ -87,8 +77,7 @@ def process_texts(kwargs):
                        kwargs['strip_diacritics'], kwargs['display'], kwargs['xml_page_tag'], kwargs['xml_page_attr'],
                        kwargs['slide_length'], kwargs['window_length'], kwargs['max_file_sim'],
                        kwargs['excluded_file_ids'], kwargs['min_sim'], kwargs['output'],
-                       kwargs['db']['functions']['stream_file_pair_matches'],
-                       kwargs['db']['functions']['stream_matching_file_id_pairs'])
+                       cache_db)
 
     # combine all matches into a single match object
     print(' * formatting JSON outputs')
@@ -112,15 +101,13 @@ def create_reader_data(infiles, strip_diacritics, output):
             json.dump(words, out, ensure_ascii=False)
 
 
-def banish_matches(banish_glob, banished_file_ids, banish_distance, delete_matches_fun, stream_file_pair_matches_fun,
-                   stream_matching_file_id_pairs_fun):
+def banish_matches(banish_glob, banished_file_ids, banish_distance, cache_db):
     """Delete banished matches from the db"""
     if banish_glob:
         print(' * banishing matches')
         g = Graph()
-        for file_id_a, file_id_b in stream_matching_file_id_pairs_fun():
-            for _, _, window_a, window_b, sim \
-                    in stream_file_pair_matches_fun(file_id_a, file_id_b):
+        for file_id_a, file_id_b in cache_db.stream_matching_file_id_pairs_fun():
+            for _, _, window_a, window_b, sim in cache_db.stream_file_pair_matches(file_id_a, file_id_b):
                 s = f'{file_id_a}.{window_a}'
                 t = f'{file_id_b}.{window_b}'
                 g.add_edge(s, t)
@@ -135,7 +122,7 @@ def banish_matches(banish_glob, banished_file_ids, banish_distance, delete_match
                     file_id, window_id = j.split('.')
                     banished_dict[file_id].add(window_id)
         # remove the banished file_id, window_id tuples from the db
-        delete_matches_fun(banished_dict)
+        cache_db.delete_matches(banished_dict)
 
 
 def get_word_counts(infiles, bounter_size, strip_diacritics, display):
