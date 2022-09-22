@@ -4,19 +4,15 @@ from pathlib import Path
 from copy import deepcopy
 from collections import defaultdict
 
-from bounter import bounter
-
 from utils import get_words, get_windows, get_window_map, parallel_map
 
 
 # Only this function is public in this file!
-def format_all_matches(compute_probabilities, bounter_size, metadata, infiles, strip_diacritics, display, xml_page_tag,
+def format_all_matches(counts, metadata, infiles, strip_diacritics, display, xml_page_tag,
                        xml_page_attr, slide_length, window_length, max_file_sim, excluded_file_ids, min_sim,
                        output, stream_file_pair_matches_fun, stream_matching_file_id_pairs_fun):
     """Format the match objects for each infile and store as JSON"""
     pairs = stream_matching_file_id_pairs_fun()
-    # obtain global counts of terms across corpus
-    counts = get_word_counts(infiles, compute_probabilities, bounter_size, strip_diacritics, display)
     parallel_map(format_file_matches, pairs, counts=counts, metadata=metadata, infiles=infiles,
                  strip_diacritics=strip_diacritics, display=display, xml_page_tag=xml_page_tag,
                  xml_page_attr=xml_page_attr, slide_length=slide_length, window_length=window_length,
@@ -64,24 +60,23 @@ def format_file_matches(file_args, counts, metadata, infiles, strip_diacritics, 
                             'sim': sim,
                         })
         # format the matches, then save into both file_id_a and file_id_b directories
-        formatted = format_matches(file_id_a, file_id_b, clusters, counts, metadata, infiles, strip_diacritics,
-                                   xml_page_tag, xml_page_attr, slide_length, window_length)
+        formatted = format_matches(file_id_a, file_id_b, clusters, counts, metadata,
+                                   Path(infiles[file_id_a]), Path(infiles[file_id_b]),
+                                   strip_diacritics, xml_page_tag, xml_page_attr, slide_length, window_length)
         for i in (file_id_a, file_id_b):
             out_dir = output / 'api' / 'matches' / str(i)
             with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w') as out:
                 json.dump(formatted, out, ensure_ascii=False)
 
 
-def format_matches(file_id_a, file_id_b, clusters, counts, metadata, infiles, strip_diacritics, xml_page_tag,
+def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, path_b, strip_diacritics, xml_page_tag,
                    xml_page_attr, slide_length, window_length):
     """Given integer file ids and clusters [{a: [], b: [], sim: []}] format matches for display"""
-    file_id_a, file_id_b, clusters = order_match_pair(file_id_a, file_id_b, clusters, metadata, infiles)
-    path_a = Path(infiles[file_id_a])
-    path_b = Path(infiles[file_id_b])
     bn_a = path_a.name
     bn_b = path_b.name
     a_meta = metadata.get(bn_a, {})
     b_meta = metadata.get(bn_b, {})
+    file_id_a, file_id_b, clusters = order_match_pair(file_id_a, file_id_b, clusters, a_meta, b_meta)
     # format the matches
     a_words = get_words(path_a, strip_diacritics, True)
     b_words = get_words(path_b, strip_diacritics, True)
@@ -102,15 +97,15 @@ def format_matches(file_id_a, file_id_b, clusters, counts, metadata, infiles, st
         formatted.append({
             '_id': str(uuid4()),
             'similarity': c['sim'],
-            'probability': get_string_prob(a_strings['match'], b_strings['match'], counts),
+            'probability': get_string_prob(a_strings['match'], b_strings['match'], counts) if counts else -1,
             'source_file_id': int(file_id_a),
             'target_file_id': int(file_id_b),
             'source_segment_ids': c['a'],
             'target_segment_ids': c['b'],
             'source_filename': bn_a,
             'target_filename': bn_b,
-            'source_file_path': infiles[file_id_a],
-            'target_file_path': infiles[file_id_b],
+            'source_file_path': str(path_a),
+            'target_file_path': str(path_a),
             'source_prematch': a_strings['prematch'],
             'target_prematch': b_strings['prematch'],
             'source_match': a_strings['match'],
@@ -137,13 +132,9 @@ def get_url(meta, windows_to_page, windows, xml_page_tag):
     return ret
 
 
-def order_match_pair(file_id_a, file_id_b, clusters, metadata, infiles):
+def order_match_pair(file_id_a, file_id_b, clusters, a_meta, b_meta):
     """Set file id a to the previously published file (if relevant)"""
-    a_meta = metadata.get(Path(infiles[file_id_a]).name, {})
-    b_meta = metadata.get(Path(infiles[file_id_b]).name, {})
-    if a_meta and b_meta and \
-            a_meta.get('year') and b_meta.get('year') and \
-            b_meta.get('year') < a_meta.get('year'):
+    if a_meta.get('year') and b_meta.get('year') and b_meta.get('year') < a_meta.get('year'):
         return [file_id_b, file_id_a, [{'a': c['b'], 'b': c['a'], 'sim': c['sim']} for c in deepcopy(clusters)]]
     else:
         return [file_id_a, file_id_b, clusters]
@@ -171,23 +162,8 @@ def get_sequences(arg):
     return sequences
 
 
-def get_word_counts(infiles, compute_probabilities, bounter_size, strip_diacritics, display):
-    """Return a bounter.bounter instance if user requested string likelihoods, else None"""
-    if compute_probabilities:
-        print(' * computing word counts')
-        counts = bounter(size_mb=bounter_size)
-        for i in infiles:
-            words = get_words(i, strip_diacritics, display)
-            counts.update(words)
-        print(' * finished computing word counts')
-        return counts
-    return None
-
-
 def get_string_prob(a, b, counts):
     """Return the maximum probability of s1 and s2 as a float"""
-    if not counts:
-        return -1
     probs_a = sum(counts[w] / counts.total() for w in a.split())
     probs_b = sum(counts[w] / counts.total() for w in b.split())
     return round(max(probs_a, probs_b), 3) * 1000

@@ -78,21 +78,20 @@ def write_candidates_sql(writes, verbose=False, cache_location=Path('.') / 'cach
 
 def write_matches_sql(writes, verbose=False, cache_location=Path('.') / 'cache'):
     """Given a db cursor and list of write operations, insert each"""
-    if writes:
-        if verbose:
-            print(' * writing', len(writes), 'matches')
-        try:
-            with closing(get_db('matches', cache_location=cache_location)) as db:
-                cursor = db.cursor()
-                cursor.executemany(
-                    'INSERT INTO matches (file_id_a, file_id_b, window_id_a, window_id_b, similarity) '
-                    'VALUES (?,?,?,?,?);',
-                    writes)
-                db.commit()
-        except sqlite3.DatabaseError:
-            # Attempt to repair the db in a process-safe manner
-            raise sqlite3.DatabaseError
-            # return write_matches(writes, **kwargs)
+    if verbose:
+        print(' * writing', len(writes), 'matches')
+    try:
+        with closing(get_db('matches', cache_location=cache_location)) as db:
+            cursor = db.cursor()
+            cursor.executemany(
+                'INSERT INTO matches (file_id_a, file_id_b, window_id_a, window_id_b, similarity) '
+                'VALUES (?,?,?,?,?);',
+                writes)
+            db.commit()
+    except sqlite3.DatabaseError:
+        # Attempt to repair the db in a process-safe manner
+        raise sqlite3.DatabaseError
+        # return write_matches(writes, **kwargs)
 
 
 def delete_matches_sql(banished_dict, verbose=False, cache_location=Path('.') / 'cache'):
@@ -131,18 +130,18 @@ def stream_hashbands_sql(verbose=False, cache_location=Path('.') / 'cache'):
             yield row
 
 
-def stream_candidate_file_id_pairs_sql(verbose=False, cache_location=Path('.') / 'cache'):
+def stream_candidate_file_id_pairs_sql(infiles, verbose=False, cache_location=Path('.') / 'cache'):
     """Stream [file_id_a, file_id_b] pairs for files with matching hashbands"""
     if verbose:
         print(' * querying for candidate file id pairs')
     with closing(get_db('candidates', cache_location=cache_location)) as db:
         cursor = db.cursor()
-        for row in cursor.execute("""
+        for file_id_a, file_id_b in cursor.execute("""
       SELECT DISTINCT file_id_a, file_id_b
       FROM candidates
       ORDER BY file_id_a, file_id_b
     """):
-            yield row
+            yield infiles[file_id_a], infiles[file_id_b], file_id_a, file_id_b
 
 
 def stream_matching_file_id_pairs_sql(cache_location):

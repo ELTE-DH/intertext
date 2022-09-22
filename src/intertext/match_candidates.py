@@ -1,6 +1,6 @@
-import multiprocessing
 from functools import partial
 from itertools import combinations
+from multiprocessing import Pool, cpu_count
 
 from utils import chunked_iterator
 
@@ -18,10 +18,9 @@ def process_candidate_hashbands(inp_hashbands, only_index, write_frequency, writ
     """Given a set of hashbands, subdivide into processes to find match candidates for each"""
     if verbose:
         print(' * processing match candidate block')
-    pool = multiprocessing.Pool()
+    pool = Pool()
     # Subdivide list `l` into units `n` long lists
-    hashbands = [list(chunk) for chunk in chunked_iterator(inp_hashbands,
-                                                           len(inp_hashbands) // multiprocessing.cpu_count())]
+    hashbands = [list(chunk) for chunk in chunked_iterator(inp_hashbands, len(inp_hashbands) // cpu_count())]
     fun = partial(get_hashband_match_candidates, only_index=only_index)
     writes = set()
     for idx, i in enumerate(pool.map(fun, hashbands)):

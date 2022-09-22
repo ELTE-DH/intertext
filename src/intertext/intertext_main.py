@@ -1,6 +1,7 @@
 import json
 from collections import defaultdict
 
+from bounter import bounter
 from networkx import all_pairs_shortest_path_length, Graph
 from networkx.algorithms.components.connected import connected_components
 
@@ -76,7 +77,13 @@ def process_texts(kwargs):
 
     # format matches into JSON for client consumption
     print(' * formatting matches')
-    format_all_matches(kwargs['compute_probabilities'], kwargs['bounter_size'], kwargs['metadata'], kwargs['infiles'],
+    # obtain global counts of terms across corpus
+    if kwargs['compute_probabilities']:
+        counts = get_word_counts(kwargs['infiles'], kwargs['bounter_size'], kwargs['strip_diacritics'],
+                                 kwargs['display'])
+    else:
+        counts = None
+    format_all_matches(counts, kwargs['metadata'], kwargs['infiles'],
                        kwargs['strip_diacritics'], kwargs['display'], kwargs['xml_page_tag'], kwargs['xml_page_attr'],
                        kwargs['slide_length'], kwargs['window_length'], kwargs['max_file_sim'],
                        kwargs['excluded_file_ids'], kwargs['min_sim'], kwargs['output'],
@@ -129,6 +136,17 @@ def banish_matches(banish_glob, banished_file_ids, banish_distance, delete_match
                     banished_dict[file_id].add(window_id)
         # remove the banished file_id, window_id tuples from the db
         delete_matches_fun(banished_dict)
+
+
+def get_word_counts(infiles, bounter_size, strip_diacritics, display):
+    """Return a bounter.bounter instance if user requested string likelihoods, else None"""
+    print(' * computing word counts')
+    counts = bounter(size_mb=bounter_size)
+    for ifnile in infiles:
+        words = get_words(ifnile, strip_diacritics, display)
+        counts.update(words)
+    print(' * finished computing word counts')
+    return counts
 
 
 if __name__ == '__main__':

@@ -8,30 +8,6 @@ from bs4 import BeautifulSoup
 from unidecode import unidecode
 
 
-@lru_cache(maxsize=1024)
-def get_words(path, strip_diacritics, display):
-    """Given a file path return a list of strings from that file"""
-    with open(path, encoding='UTF-8') as f:
-        f = f.read()
-    # optionally remove diacritics
-    if strip_diacritics and not display:
-        f = unidecode(f)
-    if not display:
-        return f.split()
-    # optionally format the list of words for display in the web viewer
-    else:
-        lines = f.replace('\n', ' __NEWLINE__ ').split()
-        formatted = []
-        for idx, i in enumerate(lines):
-            if i == '__NEWLINE__':
-                # prevent more than two consecutive brs
-                if formatted and not formatted[-1].endswith('<br/><br/>'):
-                    formatted[-1] += '<br/>'
-            else:
-                formatted.append(i)
-        return formatted
-
-
 def ngrams(it, n):
     return zip(*(islice(it, i, None) for i, it in enumerate(tee(it, n))))
 
@@ -56,6 +32,30 @@ def get_windows(path, strip_diacritics, display, window_length, slide_length):
         if idx % slide_length == 0:
             buff.append(' '.join(window))
     return buff
+
+
+@lru_cache(maxsize=1024)
+def get_words(path, strip_diacritics, display):
+    """Given a file path return a list of strings from that file"""
+    with open(path, encoding='UTF-8') as f:
+        f = f.read()
+    # optionally remove diacritics
+    if strip_diacritics and not display:
+        f = unidecode(f)
+    if not display:
+        return f.split()
+    # optionally format the list of words for display in the web viewer
+    else:
+        lines = f.replace('\n', ' __NEWLINE__ ').split()
+        formatted = []
+        for idx, i in enumerate(lines):
+            if i == '__NEWLINE__':
+                # prevent more than two consecutive brs
+                if formatted and not formatted[-1].endswith('<br/><br/>'):
+                    formatted[-1] += '<br/>'
+            else:
+                formatted.append(i)
+        return formatted
 
 
 @lru_cache(maxsize=1024)
