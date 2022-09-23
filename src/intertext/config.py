@@ -11,12 +11,11 @@ config = {
     'excluded_file_ids': tuple(),
     'banished_file_ids': tuple(),
     'metadata': '',  # file path will be turned to JSON loaded data structure
+    'only_index': None,
     'output': Path('output'),
     'cache_location': Path('cache'),
     'xml_page_tag': None,
     'xml_page_attr': None,
-    'batch_size': 10 ** 5,  # Non-CLI config
-    'write_frequency': 10 ** 5,  # TODO Non-CLI config to be
     'chargram_length': 4,  # TODO 1,2,4 byte length Non-CLI config to be
     'bounter_size': 64,  # TODO Non-CLI config to be
     'window_length': 14,
@@ -30,7 +29,6 @@ config = {
     'update_metadata': False,
     'verbose': False,
     'compute_probabilities': False,
-    'only_index': None,
 }
 
 
@@ -90,8 +88,6 @@ def parse():
                         help='the number of minhash units to slide hashband windows', required=False)
     parser.add_argument('--chargram_length', '-cl', type=int, default=config['chargram_length'],
                         help='the number of characters per character shingle', required=False)
-    parser.add_argument('--write_frequency', '-wf', type=int, default=config['write_frequency'],
-                        help='the max number of write operations to store in RAM')
     parser.add_argument('--banish_distance', '-bd', type=int, default=config['banish_distance'],
                         help='the graph distance to travel when banishing linked matches', required=False)
     parser.add_argument('--min_sim', '-s', type=check_min_sim, default=config['min_sim'],

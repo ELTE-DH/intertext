@@ -1,6 +1,6 @@
 from random import randint
 from multiprocessing import Pool
-from itertools import islice, tee, chain
+from itertools import islice, tee
 from functools import lru_cache, partial
 
 
@@ -10,17 +10,6 @@ from unidecode import unidecode
 
 def ngrams(it, n):
     return zip(*(islice(it, i, None) for i, it in enumerate(tee(it, n))))
-
-
-def chunked_iterator(iterable, n):
-    # Original source:
-    # https://stackoverflow.com/questions/8991506/iterate-an-iterator-by-chunks-of-n-in-python/29524877#29524877
-    it = iter(iterable)
-    try:
-        while True:
-            yield chain((next(it),), islice(it, n-1))
-    except StopIteration:
-        return
 
 
 @lru_cache(maxsize=1024)

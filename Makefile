@@ -27,7 +27,7 @@ venv:
 	python3 -m venv venv
 	./venv/bin/pip install poetry
 	./venv/bin/poetry env use python3
-	./venv/bin/poetry install
+	./venv/bin/poetry install --no-root
 .PHONY: venv
 
 build: venv __extra-deps

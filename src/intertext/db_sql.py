@@ -84,10 +84,10 @@ class SQLCache:
     def stream_hashbands(self):
         """Stream [hashband, file_id, window_id] sorted by hashband"""
         return self._generic_reader("""WITH file_id_counts AS (SELECT hashband, COUNT(DISTINCT(file_id)) as count
-                                                                 FROM hashbands GROUP BY hashband HAVING COUNT > 1
-                                                                 ) SELECT hashband, file_id, window_id
-                                         FROM hashbands WHERE hashband IN (SELECT hashband from file_id_counts)
-                                         ORDER BY hashband;""", (),
+                                                               FROM hashbands GROUP BY hashband HAVING COUNT > 1
+                                                               ) SELECT hashband, file_id, window_id
+                                       FROM hashbands WHERE hashband IN (SELECT hashband from file_id_counts)
+                                       ORDER BY hashband;""", (),
                                     ' * querying for hashbands')
 
     def stream_candidate_file_id_pairs(self):

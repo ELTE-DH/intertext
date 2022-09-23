@@ -47,13 +47,11 @@ def process_texts(kwargs):
         print(' * creating minhashes')
         get_all_hashbands(kwargs['infiles'], kwargs['cache_location'], kwargs['strip_diacritics'],
                           kwargs['window_length'], kwargs['slide_length'], kwargs['chargram_length'],
-                          kwargs['hashband_length'], kwargs['hashband_step'],
-                          cache_db)
+                          kwargs['hashband_length'], kwargs['hashband_step'], cache_db)
 
         # find all hashbands that have multiple distict file_ids
         print(' * identifying match candidates')
-        get_all_match_candidates(kwargs['only_index'], kwargs['write_frequency'], cache_db, kwargs['batch_size'],
-                                 kwargs['verbose'])
+        get_all_match_candidates(kwargs['only_index'], cache_db, kwargs['verbose'])
 
         # validate matches from among the candidates
         print(' * validating matches')
