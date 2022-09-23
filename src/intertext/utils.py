@@ -24,9 +24,9 @@ def chunked_iterator(iterable, n):
 
 
 @lru_cache(maxsize=1024)
-def get_windows(path, strip_diacritics, display, window_length, slide_length):
+def get_windows(path, strip_diacritics, window_length, slide_length):
     """Given a file path return a list of strings from that file"""
-    words = get_words(path, strip_diacritics, display)
+    words = get_words(path, strip_diacritics, False)
     buff = []
     for idx, window in enumerate(ngrams(words, window_length)):
         if idx % slide_length == 0:

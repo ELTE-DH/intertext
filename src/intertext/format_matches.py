@@ -8,20 +8,20 @@ from utils import get_words, get_windows, get_window_map, parallel_map
 
 
 # Only this function is public in this file!
-def format_all_matches(counts, metadata, infiles, strip_diacritics, display, xml_page_tag,
-                       xml_page_attr, slide_length, window_length, max_file_sim, excluded_file_ids, min_sim,
+def format_all_matches(counts, metadata, infiles, strip_diacritics, xml_page_tag,
+                       xml_page_attr, window_length, slide_length, max_file_sim, excluded_file_ids, min_sim,
                        output, cache_db):
     """Format the match objects for each infile and store as JSON"""
     pairs = cache_db.stream_matching_file_id_pairs()
     parallel_map(format_file_matches, pairs, counts=counts, metadata=metadata, infiles=infiles,
-                 strip_diacritics=strip_diacritics, display=display, xml_page_tag=xml_page_tag,
-                 xml_page_attr=xml_page_attr, slide_length=slide_length, window_length=window_length,
+                 strip_diacritics=strip_diacritics, xml_page_tag=xml_page_tag,
+                 xml_page_attr=xml_page_attr, window_length=window_length, slide_length=slide_length,
                  max_file_sim=max_file_sim, excluded_file_ids=excluded_file_ids, min_sim=min_sim, output=output,
                  cache_db=cache_db)
 
 
-def format_file_matches(file_args, counts, metadata, infiles, strip_diacritics, display, xml_page_tag, xml_page_attr,
-                        slide_length, window_length, max_file_sim, excluded_file_ids, min_sim, output, cache_db):
+def format_file_matches(file_args, counts, metadata, infiles, strip_diacritics, xml_page_tag, xml_page_attr,
+                        window_length, slide_length, max_file_sim, excluded_file_ids, min_sim, output, cache_db):
     """'Format the matches for a single file pair"""
     file_id_a, file_id_b = file_args
     if excluded_file_ids and (file_id_a in excluded_file_ids or file_id_b in excluded_file_ids):
@@ -29,8 +29,8 @@ def format_file_matches(file_args, counts, metadata, infiles, strip_diacritics, 
     pair_matches = list(cache_db.stream_file_pair_matches(file_id_a, file_id_b))
     if pair_matches:
         # check to see if this file pair has >= max allowed similarity
-        a_windows = get_windows(infiles[file_id_a], strip_diacritics, display, window_length, slide_length)
-        b_windows = get_windows(infiles[file_id_b], strip_diacritics, display, window_length, slide_length)
+        a_windows = get_windows(infiles[file_id_a], strip_diacritics, window_length, slide_length)
+        b_windows = get_windows(infiles[file_id_b], strip_diacritics, window_length, slide_length)
         if max_file_sim and ((len(pair_matches) > len(a_windows) * max_file_sim) or
                              (len(pair_matches) > len(b_windows) * max_file_sim)):
             print(' * file pair', *file_args, 'has >= max_file_sim; skipping!')
@@ -61,15 +61,15 @@ def format_file_matches(file_args, counts, metadata, infiles, strip_diacritics, 
         # format the matches, then save into both file_id_a and file_id_b directories
         formatted = format_matches(file_id_a, file_id_b, clusters, counts, metadata,
                                    Path(infiles[file_id_a]), Path(infiles[file_id_b]),
-                                   strip_diacritics, xml_page_tag, xml_page_attr, slide_length, window_length)
+                                   strip_diacritics, xml_page_tag, xml_page_attr, window_length, slide_length)
         for i in (file_id_a, file_id_b):
             out_dir = output / 'api' / 'matches' / str(i)
-            with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w') as out:
+            with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w', encoding='UTF-8') as out:
                 json.dump(formatted, out, ensure_ascii=False)
 
 
 def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, path_b, strip_diacritics, xml_page_tag,
-                   xml_page_attr, slide_length, window_length):
+                   xml_page_attr, window_length, slide_length):
     """Given integer file ids and clusters [{a: [], b: [], sim: []}] format matches for display"""
     bn_a = path_a.name
     bn_b = path_b.name
@@ -91,8 +91,8 @@ def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, pat
             print(' * unable to retrieve mapping from window to page id')
     # each member c in clusters is a dictionary {a: b: } where values contain the match windows
     for c in clusters:
-        a_strings = get_match_strings(a_words, c['a'], slide_length, window_length)
-        b_strings = get_match_strings(b_words, c['b'], slide_length, window_length)
+        a_strings = get_match_strings(a_words, c['a'], window_length, slide_length)
+        b_strings = get_match_strings(b_words, c['b'], window_length, slide_length)
         formatted.append({
             '_id': str(uuid4()),
             'similarity': c['sim'],
@@ -139,7 +139,7 @@ def order_match_pair(file_id_a, file_id_b, clusters, a_meta, b_meta):
         return [file_id_a, file_id_b, clusters]
 
 
-def get_match_strings(words, window_ids, slide_length, window_length):
+def get_match_strings(words, window_ids, window_length, slide_length):
     """Given a list of words and window ids, format prematch, match, and postmatch strings for a match"""
     start = min(window_ids) * slide_length
     end = max(window_ids) * slide_length + window_length

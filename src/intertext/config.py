@@ -1,3 +1,4 @@
+import json
 import glob
 import argparse
 from pathlib import Path
@@ -7,33 +8,28 @@ config = {
     'infile_glob': '',
     'banish_glob': '',
     'exclude_glob': '',
+    'excluded_file_ids': tuple(),
+    'banished_file_ids': tuple(),
+    'metadata': '',  # file path will be turned to JSON loaded data structure
     'output': Path('output'),
     'cache_location': Path('cache'),
-    'metadata': {},
     'xml_page_tag': None,
     'xml_page_attr': None,
-    'batch_size': 10 ** 5,
-    'write_frequency': 10 ** 5,
-    'chargram_length': 4,
+    'batch_size': 10 ** 5,  # Non-CLI config
+    'write_frequency': 10 ** 5,  # TODO Non-CLI config to be
+    'chargram_length': 4,  # TODO 1,2,4 byte length Non-CLI config to be
+    'bounter_size': 64,  # TODO Non-CLI config to be
     'window_length': 14,
     'slide_length': 4,
     'hashband_length': 4,
     'hashband_step': 3,
     'banish_distance': 4,
     'min_sim': 50,
-    'excluded_file_ids': tuple(),
-    'banish_file_ids': tuple(),
-    'banished_file_ids': tuple(),
     'max_file_sim': None,
-    'client': '0.0.1a',
-    'update_client': False,
     'strip_diacritics': False,
-    'db': 'sqlite',
     'update_metadata': False,
     'verbose': False,
     'compute_probabilities': False,
-    'bounter_size': 64,
-    'display': False,
     'only_index': None,
 }
 
@@ -58,6 +54,19 @@ def non_empty_glob(string):
     return infiles
 
 
+def load_metadata_file(string):
+    metadata_path = Path(string)
+    if len(string) == 0:
+        metadata = {}
+    elif not metadata_path.is_file() or not metadata_path.exists():
+        raise ValueError('Metadata file should be an existing JSON file!')
+    else:
+        with open(string, encoding='UTF-8') as fh:
+            metadata = json.load(fh)
+
+    return metadata
+
+
 # This is the module's main function (CLI)
 def parse():
     """Parse the command line arguments and initialize text processing"""
@@ -69,10 +78,12 @@ def parse():
                         help='path to a glob of text files to banish from matches', required=False)
     parser.add_argument('--exclude', type=str, default=config['exclude_glob'], dest='exclude_glob',
                         help='path to a glob of text files to exclude from matches', required=False)
-    parser.add_argument('--metadata', '-m', type=Path, default=config['metadata'],
+    parser.add_argument('--metadata', '-m', type=load_metadata_file, default=config['metadata'],
                         help='path to a JSON metadata file (see README)', required=False)
     parser.add_argument('--window_length', '-w', type=int, default=config['window_length'],
-                        help='the length of windows when processing files (see README)', required=False)
+                        help='the length of windows in words when processing files', required=False)
+    parser.add_argument('--slide_length', '-l', type=int, default=config['slide_length'],
+                        help='the length to slide windows when processing files', required=False)
     parser.add_argument('--hashband_length', '-hb', type=int, default=config['hashband_length'],
                         help='the number of minhash values per hashband', required=False)
     parser.add_argument('--hashband_step', '-hs', type=int, default=config['hashband_step'],
@@ -81,8 +92,6 @@ def parse():
                         help='the number of characters per character shingle', required=False)
     parser.add_argument('--write_frequency', '-wf', type=int, default=config['write_frequency'],
                         help='the max number of write operations to store in RAM')
-    parser.add_argument('--slide_length', '-l', type=int, default=config['slide_length'],
-                        help='the length to slide windows when processing files (see README)', required=False)
     parser.add_argument('--banish_distance', '-bd', type=int, default=config['banish_distance'],
                         help='the graph distance to travel when banishing linked matches', required=False)
     parser.add_argument('--min_sim', '-s', type=check_min_sim, default=config['min_sim'],
@@ -96,7 +105,7 @@ def parse():
     parser.add_argument('--xml_page_attr', type=str, default=config['xml_page_attr'],
                         help='if specified, urls can reference content within this attr of xml_page_tag')
     parser.add_argument('--strip_diacritics', default=config['strip_diacritics'],
-                        help='if specified, diacritics will be parsed from texts during processing', required=False,
+                        help='if specified, diacritics will be stripped from texts during processing', required=False,
                         action='store_true')
     parser.add_argument('--verbose', '-v', default=config['verbose'],
                         help='if specified, the intertext process will log more operations', required=False,

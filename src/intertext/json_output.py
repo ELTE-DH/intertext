@@ -13,11 +13,11 @@ def create_all_match_json(output, compute_probabilities):
         # buff contains the flat list of matches for a single input file
         buff = []
         for match_pair_json in match_directory.glob('*.json'):
-            with open(match_pair_json) as fh:
+            with open(match_pair_json, encoding='UTF-8') as fh:
                 buff += json.load(fh)
         for i in buff:
             i['_id'] = guid_to_int[i['_id']]
-        with open(f'{match_directory}.json', 'w') as out:
+        with open(f'{match_directory}.json', 'w', encoding='UTF-8') as out:
             json.dump(buff, out, ensure_ascii=False)
         rmtree(match_directory)
 
@@ -52,7 +52,7 @@ def create_all_match_json(output, compute_probabilities):
             inverse_order = label in {'similarity', 'length', 'probability'}
             sorted_list = sorted(buff, key=lambda x: x[idx], reverse=inverse_order)
             ids = [conv_to_ints(i[:6]) for i in sorted_list]
-            with open(output / 'api' / 'indices' / f'match-ids-by-{label}.json', 'w') as out:
+            with open(output / 'api' / 'indices' / f'match-ids-by-{label}.json', 'w', encoding='UTF-8') as out:
                 json.dump(ids, out, ensure_ascii=False)
 
     # create the scatterplot data
@@ -98,14 +98,14 @@ def write_scatterplots(output):
                         'target_year': o['target_year'],
                     })
                 # write the scatterplot data
-                with open(Path(out_dir) / f'{i}-{j}-{k}.json', 'w') as out:
+                with open(Path(out_dir) / f'{i}-{j}-{k}.json', 'w', encoding='UTF-8') as out:
                     json.dump(scatterplot_data, out, ensure_ascii=False)
 
 
 def stream_match_lists(output):
     """Stream a stream of (file_id, [match, match, ...]) objects"""
     for json_file in (output / 'api' / 'matches').glob('*.json'):
-        with open(json_file) as f:
+        with open(json_file, encoding='UTF-8') as f:
             match_list = json.load(f)
         yield json_file.stem, match_list
 

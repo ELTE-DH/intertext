@@ -46,7 +46,7 @@ def process_texts(kwargs):
         # minhash files & store hashbands in db
         print(' * creating minhashes')
         get_all_hashbands(kwargs['infiles'], kwargs['cache_location'], kwargs['strip_diacritics'],
-                          kwargs['display'], kwargs['window_length'], kwargs['slide_length'], kwargs['chargram_length'],
+                          kwargs['window_length'], kwargs['slide_length'], kwargs['chargram_length'],
                           kwargs['hashband_length'], kwargs['hashband_step'],
                           cache_db)
 
@@ -57,7 +57,7 @@ def process_texts(kwargs):
 
         # validate matches from among the candidates
         print(' * validating matches')
-        validate_all_matches(kwargs['infiles'], kwargs['strip_diacritics'], kwargs['display'], kwargs['window_length'],
+        validate_all_matches(kwargs['infiles'], kwargs['strip_diacritics'], kwargs['window_length'],
                              kwargs['slide_length'], kwargs['min_sim'], cache_db)
     else:
         cache_db = SQLCache('cache', db_dir=kwargs['cache_location'], verbose=kwargs['verbose'])
@@ -71,12 +71,11 @@ def process_texts(kwargs):
     # obtain global counts of terms across corpus
     counts = None
     if kwargs['compute_probabilities']:
-        counts = get_word_counts(kwargs['infiles'], kwargs['bounter_size'], kwargs['strip_diacritics'],
-                                 kwargs['display'])
+        counts = get_word_counts(kwargs['infiles'], kwargs['bounter_size'], kwargs['strip_diacritics'])
 
     format_all_matches(counts, kwargs['metadata'], kwargs['infiles'],
-                       kwargs['strip_diacritics'], kwargs['display'], kwargs['xml_page_tag'], kwargs['xml_page_attr'],
-                       kwargs['slide_length'], kwargs['window_length'], kwargs['max_file_sim'],
+                       kwargs['strip_diacritics'], kwargs['xml_page_tag'], kwargs['xml_page_attr'],
+                       kwargs['window_length'], kwargs['slide_length'], kwargs['max_file_sim'],
                        kwargs['excluded_file_ids'], kwargs['min_sim'], kwargs['output'],
                        cache_db)
 
@@ -96,9 +95,6 @@ def process_texts(kwargs):
 
 def get_metadata(infiles, metadata):
     """if the user provided metadata, load it"""
-    if isinstance(metadata, (Path, str)):
-        with open(metadata) as fh:
-            metadata = json.load(fh)
     for infile in infiles:
         basename = infile.name
         if basename not in metadata:
@@ -138,7 +134,7 @@ def banish_matches(banished_file_ids, banish_distance, cache_db):
     g = Graph()
     for file_id_a, file_id_b, window_a, window_b, sim in cache_db.stream_all_pair_matches():
         g.add_edge((file_id_a, window_a), (file_id_b, window_b))  # edges between file_id and windows pairs
-    # create d[file_id] = [window_id, window_id] of banished windows
+    # create list of banished windows to be deleted
     deletes = []
     distances = dict(all_pairs_shortest_path_length(g))
     for graph_component in list(connected_components(g)):
@@ -151,12 +147,12 @@ def banish_matches(banished_file_ids, banish_distance, cache_db):
     cache_db.delete_matches(deletes)
 
 
-def get_word_counts(infiles, bounter_size, strip_diacritics, display):
+def get_word_counts(infiles, bounter_size, strip_diacritics):
     """Return a bounter.bounter instance if user requested string likelihoods"""
     print(' * computing word counts')
     counts = bounter(size_mb=bounter_size)
     for ifnile in infiles:
-        words = get_words(ifnile, strip_diacritics, display)
+        words = get_words(ifnile, strip_diacritics, False)
         counts.update(words)
     print(' * finished computing word counts')
     return counts
@@ -174,7 +170,7 @@ def write_config(infiles, inp_metadata, excluded_file_ids, banished_file_ids, ou
                              # we need the results here
                              'matches': (output / 'api' / 'matches' / f'{idx}.json').stat().st_size > 2,
                              })
-    with open(output / 'api' / 'config.json', 'w') as out:
+    with open(output / 'api' / 'config.json', 'w', encoding='UTF-8') as out:
         json.dump({'infiles': [str(infile) for infile in infiles],
                    'metadata': metadata,
                    'window_size': window_length,
@@ -186,7 +182,7 @@ def create_reader_data(infiles, strip_diacritics, output):
     """Create the data to be used in the reader view"""
     for idx, infile in enumerate(infiles):
         words = get_words(infile, strip_diacritics, True)
-        with open(output / 'api' / 'texts' / f'{idx}.json', 'w') as out:
+        with open(output / 'api' / 'texts' / f'{idx}.json', 'w', encoding='UTF-8') as out:
             json.dump(words, out, ensure_ascii=False)
 
 
