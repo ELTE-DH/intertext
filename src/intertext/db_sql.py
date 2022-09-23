@@ -1,11 +1,9 @@
 import sqlite3
-from pathlib import Path
-from itertools import chain
 from contextlib import contextmanager
 
 
 class SQLCache:
-    def __init__(self, db_name, db_dir=Path('.') / 'cache', initialize=False, verbose=False):
+    def __init__(self, db_name, db_dir, initialize=False, verbose=False):
         self._db_name = db_name
         self._db_dir = db_dir
         self._verbose = verbose
@@ -69,10 +67,8 @@ class SQLCache:
             'INSERT INTO matches (file_id_a, file_id_b, window_id_a, window_id_b, similarity) VALUES (?,?,?,?,?);',
             writes, f' * writing {len(writes)} matches')
 
-    def delete_matches(self, banished_dict):
+    def delete_matches(self, deletes):
         """Given d[file_id] = [window_id], delete all specified windows"""
-        deletes = list(chain.from_iterable(((file_id, i, file_id, i) for i in window_ids)
-                                           for file_id, window_ids in banished_dict.items()))
         self._generic_writer(
             'DELETE FROM matches WHERE file_id_a = (?) AND window_id_a = (?) OR file_id_b = (?) and window_id_b = (?);',
             deletes, f' * deleting {len(deletes)} matches')
@@ -94,12 +90,11 @@ class SQLCache:
                                          ORDER BY hashband;""", (),
                                     ' * querying for hashbands')
 
-    def stream_candidate_file_id_pairs(self, infiles):
+    def stream_candidate_file_id_pairs(self):
         """Stream [file_id_a, file_id_b] pairs for files with matching hashbands"""
-        for file_id_a, file_id_b in self._generic_reader(
-                'SELECT DISTINCT file_id_a, file_id_b FROM candidates ORDER BY file_id_a, file_id_b;', (),
-                ' * querying for candidate file id pairs'):
-            yield infiles[file_id_a], infiles[file_id_b], file_id_a, file_id_b
+        return self._generic_reader(
+           'SELECT DISTINCT file_id_a, file_id_b FROM candidates ORDER BY file_id_a, file_id_b;', (),
+           ' * querying for candidate file id pairs')
 
     def stream_matching_file_id_pairs(self):
         """Stream [file_id_a, file_id_b] for file ids that have verified matches"""
@@ -113,7 +108,12 @@ class SQLCache:
                                     ' * querying for matching candidate windows')
 
     def stream_file_pair_matches(self, file_id_a, file_id_b):
-        """Stream [file_id_a, file_id_b, window_id_a, window_id_b, similarity] for a match pair"""
-        return self._generic_reader('SELECT * FROM matches WHERE file_id_a = ? AND file_id_b = ?',
-                                    (file_id_a, file_id_b),
+        """Stream [window_id_a, window_id_b, similarity] for a match pair in file_id_a and file_id_b"""
+        return self._generic_reader('SELECT window_id_a, window_id_b, similarity FROM matches '
+                                    'WHERE file_id_a = ? AND file_id_b = ?;', (file_id_a, file_id_b),
+                                    ' * querying for file pair matches')
+
+    def stream_all_pair_matches(self):
+        """Stream [file_id_a, file_id_b, window_id_a, window_id_b, similarity] for all match pairs"""
+        return self._generic_reader('SELECT * FROM matches;', (),
                                     ' * querying for file pair matches')

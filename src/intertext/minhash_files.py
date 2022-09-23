@@ -1,14 +1,14 @@
 import numpy as np
-from vminhash import byte_hashes
+from vminhash import VectorizedMinHash, byte_hashes
 
 from utils import get_windows, ngrams, parallel_map
 
 
 # Only this function is public in this file!
-def get_all_hashbands(infiles, cache_location, hasher, strip_diacritics,
-                      display, window_length, slide_length, chargram_length, hashband_length, hashband_step,
-                      cache_db):
+def get_all_hashbands(infiles, cache_location, strip_diacritics, display, window_length, slide_length, chargram_length,
+                      hashband_length, hashband_step, cache_db):
     """Generate and save hashbands for each infile"""
+    hasher = VectorizedMinHash(n_perm=256)
     buff = [(idx, file_path, cache_location / 'minhashes' / (str(file_path).replace('/', '___') + '.npy'))
             for idx, file_path in enumerate(infiles)]
     parallel_map(get_file_hashbands, buff, hasher=hasher, strip_diacritics=strip_diacritics, display=display,

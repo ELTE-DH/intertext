@@ -37,7 +37,7 @@ def format_file_matches(file_args, counts, metadata, infiles, strip_diacritics, 
             return
         # cluster the matches so sequential matching windows are grouped into a single match
         clusters = []
-        _, _, window_a, window_b, sims = zip(*pair_matches)
+        window_a, window_b, sims = zip(*pair_matches)
         d = defaultdict(lambda: {})
         for a, b, sim in zip(window_a, window_b, sims):
             d[a][b] = sim

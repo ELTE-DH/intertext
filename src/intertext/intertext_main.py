@@ -1,26 +1,24 @@
 import json
-from collections import defaultdict
+from pathlib import Path
+from shutil import rmtree, copytree
 
 from bounter import bounter
 from networkx import all_pairs_shortest_path_length, Graph
 from networkx.algorithms.components.connected import connected_components
 
-
 from utils import get_words
+from db_sql import SQLCache
+from config import parse, process_kwargs
 from minhash_files import get_all_hashbands
 from format_matches import format_all_matches
 from json_output import create_all_match_json
 from validate_matches import validate_all_matches
 from match_candidates import get_all_match_candidates
-from config import parse, process_kwargs, prepare_output_directories, write_config
-from db_sql import SQLCache
+
 
 """
 TODO:
   * add flag to indicate if same-author matches are allowed
-  * add support for CSV metadata
-  * add support for xml + txt in same run
-  * add MySQL db backend
   * if resuming, process output/config.json to get the files and file ids
   @PG:
   * Handling words containing punctuations only
@@ -34,6 +32,9 @@ def process_texts(kwargs):
     # identify the infiles
     kwargs = process_kwargs(kwargs)
 
+    # get the metadata (if any)
+    kwargs['metadata'] = get_metadata(kwargs['infiles'], kwargs['metadata'])
+
     # create the output directories where results will be stored
     prepare_output_directories(kwargs['output'], kwargs['cache_location'], kwargs['infiles'])
 
@@ -44,7 +45,7 @@ def process_texts(kwargs):
 
         # minhash files & store hashbands in db
         print(' * creating minhashes')
-        get_all_hashbands(kwargs['infiles'], kwargs['cache_location'], kwargs['hasher'], kwargs['strip_diacritics'],
+        get_all_hashbands(kwargs['infiles'], kwargs['cache_location'], kwargs['strip_diacritics'],
                           kwargs['display'], kwargs['window_length'], kwargs['slide_length'], kwargs['chargram_length'],
                           kwargs['hashband_length'], kwargs['hashband_step'],
                           cache_db)
@@ -62,17 +63,17 @@ def process_texts(kwargs):
         cache_db = SQLCache('cache', db_dir=kwargs['cache_location'], verbose=kwargs['verbose'])
 
     # banish matches if necessary
-    if kwargs['banish_glob']:
-        banish_matches(kwargs['banish_glob'], kwargs['banished_file_ids'], kwargs['banish_distance'], cache_db)
+    if kwargs['banished_file_ids']:
+        banish_matches(kwargs['banished_file_ids'], kwargs['banish_distance'], cache_db)
 
     # format matches into JSON for client consumption
     print(' * formatting matches')
     # obtain global counts of terms across corpus
+    counts = None
     if kwargs['compute_probabilities']:
         counts = get_word_counts(kwargs['infiles'], kwargs['bounter_size'], kwargs['strip_diacritics'],
                                  kwargs['display'])
-    else:
-        counts = None
+
     format_all_matches(counts, kwargs['metadata'], kwargs['infiles'],
                        kwargs['strip_diacritics'], kwargs['display'], kwargs['xml_page_tag'], kwargs['xml_page_attr'],
                        kwargs['slide_length'], kwargs['window_length'], kwargs['max_file_sim'],
@@ -93,40 +94,65 @@ def process_texts(kwargs):
     create_reader_data(kwargs['infiles'], kwargs['strip_diacritics'], kwargs['output'])
 
 
-def create_reader_data(infiles, strip_diacritics, output):
-    """Create the data to be used in the reader view"""
-    for idx, i in enumerate(infiles):
-        words = get_words(i, strip_diacritics, True)
-        with open(output / 'api' / 'texts' / f'{idx}.json', 'w') as out:
-            json.dump(words, out, ensure_ascii=False)
+def get_metadata(infiles, metadata):
+    """if the user provided metadata, load it"""
+    if isinstance(metadata, (Path, str)):
+        with open(metadata) as fh:
+            metadata = json.load(fh)
+    for infile in infiles:
+        basename = infile.name
+        if basename not in metadata:
+            metadata[basename] = {}
+        if not metadata[basename].get('author'):
+            metadata[basename]['author'] = 'Unknown'
+        if not metadata[basename].get('title'):
+            metadata[basename]['title'] = basename
+        for j in metadata[basename]:
+            if isinstance(metadata[basename][j], str):
+                metadata[basename][j] = metadata[basename][j].strip()
+
+    return metadata
 
 
-def banish_matches(banish_glob, banished_file_ids, banish_distance, cache_db):
+def prepare_output_directories(output, cache_location, infiles):
+    """Create the folders that store output objects"""
+    # Copy the client to the output directory
+    if output.exists():
+        rmtree(output)
+    # copy the `build` directory to the output directory
+    copytree(Path(__file__).parent / 'client' / 'build', output)
+
+    for i in ('matches', 'scatterplots', 'indices', 'texts'):
+        (output / 'api' / i).mkdir(parents=True, exist_ok=True)
+
+    for i in ('minhashes',):
+        (cache_location / i).mkdir(parents=True, exist_ok=True)
+
+    for i in range(len(infiles)):
+        (output / 'api' / 'matches' / str(i)).mkdir(parents=True, exist_ok=True)
+
+
+def banish_matches(banished_file_ids, banish_distance, cache_db):
     """Delete banished matches from the db"""
-    if banish_glob:
-        print(' * banishing matches')
-        g = Graph()
-        for file_id_a, file_id_b in cache_db.stream_matching_file_id_pairs_fun():
-            for _, _, window_a, window_b, sim in cache_db.stream_file_pair_matches(file_id_a, file_id_b):
-                s = f'{file_id_a}.{window_a}'
-                t = f'{file_id_b}.{window_b}'
-                g.add_edge(s, t)
-        # create d[file_id] = [window_id, window_id] of banished windows
-        banished_dict = defaultdict(set)
-        distances = dict(all_pairs_shortest_path_length(g))
-        for i in list(connected_components(g)):
-            banished_ids = [j for j in i if int(j.split('.')[0]) in banished_file_ids]
-            # search up to maximum path length between nodes so nodes linked to a banished node are removed
-            for j in i:
-                if any(distances[j][k] < banish_distance for k in banished_ids):
-                    file_id, window_id = j.split('.')
-                    banished_dict[file_id].add(window_id)
-        # remove the banished file_id, window_id tuples from the db
-        cache_db.delete_matches(banished_dict)
+    print(' * banishing matches')
+    g = Graph()
+    for file_id_a, file_id_b, window_a, window_b, sim in cache_db.stream_all_pair_matches():
+        g.add_edge((file_id_a, window_a), (file_id_b, window_b))  # edges between file_id and windows pairs
+    # create d[file_id] = [window_id, window_id] of banished windows
+    deletes = []
+    distances = dict(all_pairs_shortest_path_length(g))
+    for graph_component in list(connected_components(g)):
+        banished_nodes = [graph_node for graph_node in graph_component if graph_node[0] in banished_file_ids]
+        # search up to maximum path length between nodes so nodes linked to a banished node are removed
+        for graph_node in graph_component:
+            if any(distances[graph_node][banished_node] < banish_distance for banished_node in banished_nodes):
+                deletes.append((graph_node[0], graph_node[1], graph_node[0], graph_node[1]))
+    # remove the banished file_id, window_id tuples (which matches start or end with) from the db
+    cache_db.delete_matches(deletes)
 
 
 def get_word_counts(infiles, bounter_size, strip_diacritics, display):
-    """Return a bounter.bounter instance if user requested string likelihoods, else None"""
+    """Return a bounter.bounter instance if user requested string likelihoods"""
     print(' * computing word counts')
     counts = bounter(size_mb=bounter_size)
     for ifnile in infiles:
@@ -134,6 +160,34 @@ def get_word_counts(infiles, bounter_size, strip_diacritics, display):
         counts.update(words)
     print(' * finished computing word counts')
     return counts
+
+
+def write_config(infiles, inp_metadata, excluded_file_ids, banished_file_ids, output, window_length, slide_length):
+    # map each author and title to the files in which that string occurs and save those maps
+    metadata = []
+    for idx, infile in enumerate(infiles):
+        if infile not in excluded_file_ids and infile not in banished_file_ids:
+            file_meta = inp_metadata[infile.name]
+            metadata.append({'id': idx,
+                             'author': file_meta['author'],
+                             'title': file_meta['title'],
+                             # we need the results here
+                             'matches': (output / 'api' / 'matches' / f'{idx}.json').stat().st_size > 2,
+                             })
+    with open(output / 'api' / 'config.json', 'w') as out:
+        json.dump({'infiles': [str(infile) for infile in infiles],
+                   'metadata': metadata,
+                   'window_size': window_length,
+                   'window_slide': slide_length,
+                   }, out, ensure_ascii=False)
+
+
+def create_reader_data(infiles, strip_diacritics, output):
+    """Create the data to be used in the reader view"""
+    for idx, infile in enumerate(infiles):
+        words = get_words(infile, strip_diacritics, True)
+        with open(output / 'api' / 'texts' / f'{idx}.json', 'w') as out:
+            json.dump(words, out, ensure_ascii=False)
 
 
 if __name__ == '__main__':

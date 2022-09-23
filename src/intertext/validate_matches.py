@@ -7,7 +7,8 @@ from utils import get_windows, parallel_map
 def validate_all_matches(infiles, strip_diacritics, display, window_length,
                          slide_length, min_sim, cache_db):
     """Run match validations and yield [a_file,b_file,a_window,b_window]"""
-    pairs = cache_db.stream_candidate_file_id_pairs(infiles)
+    pairs = [(infiles[file_id_a], infiles[file_id_b], file_id_a, file_id_b)
+             for file_id_a, file_id_b in cache_db.stream_candidate_file_id_pairs()]
     parallel_map(validate_file_matches, pairs, strip_diacritics=strip_diacritics, display=display,
                  window_length=window_length, slide_length=slide_length, min_sim=min_sim, cache_db=cache_db)
 
