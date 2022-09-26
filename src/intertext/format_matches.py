@@ -8,62 +8,60 @@ from utils import get_words, get_windows, get_window_map, parallel_map
 
 
 # Only this function is public in this file!
-def format_all_matches(counts, metadata, infiles, strip_diacritics, xml_page_tag,
-                       xml_page_attr, window_length, slide_length, max_file_sim, excluded_file_ids, min_sim,
-                       output, cache_db):
+def format_all_matches(counts, metadata, infiles, strip_diacritics, xml_page_tag, xml_page_attr, window_length,
+                       slide_length, min_sim, max_file_sim, excluded_file_ids, output, cache_db):
     """Format the match objects for each infile and store as JSON"""
-    pairs = cache_db.stream_matching_file_id_pairs()
+    pairs = ((file_id_a, file_id_b) for file_id_a, file_id_b in cache_db.stream_matching_file_id_pairs()
+             if file_id_a not in excluded_file_ids or file_id_b not in excluded_file_ids)
     parallel_map(format_file_matches, pairs, counts=counts, metadata=metadata, infiles=infiles,
                  strip_diacritics=strip_diacritics, xml_page_tag=xml_page_tag,
                  xml_page_attr=xml_page_attr, window_length=window_length, slide_length=slide_length,
-                 max_file_sim=max_file_sim, excluded_file_ids=excluded_file_ids, min_sim=min_sim, output=output,
-                 cache_db=cache_db)
+                 min_sim=min_sim, max_file_sim=max_file_sim, output=output, cache_db=cache_db)
 
 
-def format_file_matches(file_args, counts, metadata, infiles, strip_diacritics, xml_page_tag, xml_page_attr,
-                        window_length, slide_length, max_file_sim, excluded_file_ids, min_sim, output, cache_db):
+def format_file_matches(pairs, counts, metadata, infiles, strip_diacritics, xml_page_tag, xml_page_attr,
+                        window_length, slide_length, min_sim, max_file_sim, output, cache_db):
     """'Format the matches for a single file pair"""
-    file_id_a, file_id_b = file_args
-    if excluded_file_ids and (file_id_a in excluded_file_ids or file_id_b in excluded_file_ids):
-        return
+    file_id_a, file_id_b = pairs
     pair_matches = list(cache_db.stream_file_pair_matches(file_id_a, file_id_b))
-    if pair_matches:
+    len_pair_matches = len(pair_matches)
+    if len_pair_matches > 0:
         # check to see if this file pair has >= max allowed similarity
         a_windows = get_windows(infiles[file_id_a], strip_diacritics, window_length, slide_length)
         b_windows = get_windows(infiles[file_id_b], strip_diacritics, window_length, slide_length)
-        if max_file_sim and ((len(pair_matches) > len(a_windows) * max_file_sim) or
-                             (len(pair_matches) > len(b_windows) * max_file_sim)):
-            print(' * file pair', *file_args, 'has >= max_file_sim; skipping!')
+        if max_file_sim and ((len_pair_matches > len(a_windows) * max_file_sim) or
+                             (len_pair_matches > len(b_windows) * max_file_sim)):
+            print(' * file pair', file_id_a, file_id_b, 'has >= max_file_sim; skipping!')
             return
         # cluster the matches so sequential matching windows are grouped into a single match
         clusters = []
         window_a, window_b, sims = zip(*pair_matches)
         d = defaultdict(lambda: {})
-        for a, b, sim in zip(window_a, window_b, sims):
+        for a, b, sim in pair_matches:
             d[a][b] = sim
         for a in get_sequences(window_a):
             for b in get_sequences(window_b):
                 cluster = {'a': set(), 'b': set(), 'sim': []}
                 for a_i in a:
                     for b_i in b:
-                        if d[a_i].get(b_i):
+                        sim = d[a_i].get(b_i)
+                        if sim is not None:
                             cluster['a'].add(a_i)
                             cluster['b'].add(b_i)
-                            cluster['sim'].append(d[a_i][b_i])
-                if cluster['a'] and cluster['b']:
-                    sim = int(sum(cluster['sim']) / len(cluster['sim']))
-                    if sim >= min_sim:
-                        clusters.append({
-                            'a': sorted(cluster['a']),
-                            'b': sorted(cluster['b']),
-                            'sim': sim,
-                        })
+                            cluster['sim'].append(sim)
+                if len(cluster['a']) > 0:  # len(cluster['b']) > 0 is also true as they are simultaneously filled
+                    sim_avg = int(sum(cluster['sim']) / len(cluster['sim']))
+                    if sim_avg >= min_sim:
+                        clusters.append({'a': sorted(cluster['a']),
+                                         'b': sorted(cluster['b']),
+                                         'sim': sim_avg,
+                                         })
         # format the matches, then save into both file_id_a and file_id_b directories
         formatted = format_matches(file_id_a, file_id_b, clusters, counts, metadata,
                                    Path(infiles[file_id_a]), Path(infiles[file_id_b]),
                                    strip_diacritics, xml_page_tag, xml_page_attr, window_length, slide_length)
-        for i in (file_id_a, file_id_b):
-            out_dir = output / 'api' / 'matches' / str(i)
+        for curr_file_id in (file_id_a, file_id_b):  # write twice per match
+            out_dir = output / 'api' / 'matches' / str(curr_file_id)
             with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w', encoding='UTF-8') as out:
                 json.dump(formatted, out, ensure_ascii=False)
 
@@ -73,8 +71,8 @@ def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, pat
     """Given integer file ids and clusters [{a: [], b: [], sim: []}] format matches for display"""
     bn_a = path_a.name
     bn_b = path_b.name
-    a_meta = metadata.get(bn_a, {})
-    b_meta = metadata.get(bn_b, {})
+    a_meta = metadata[bn_a]
+    b_meta = metadata[bn_b]
     file_id_a, file_id_b, clusters = order_match_pair(file_id_a, file_id_b, clusters, a_meta, b_meta)
     # format the matches
     a_words = get_words(path_a, strip_diacritics, True)
@@ -93,33 +91,37 @@ def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, pat
     for c in clusters:
         a_strings = get_match_strings(a_words, c['a'], window_length, slide_length)
         b_strings = get_match_strings(b_words, c['b'], window_length, slide_length)
-        formatted.append({
-            '_id': str(uuid4()),
-            'similarity': c['sim'],
-            'probability': get_string_prob(a_strings['match'], b_strings['match'], counts) if counts else -1,
-            'source_file_id': int(file_id_a),
-            'target_file_id': int(file_id_b),
-            'source_segment_ids': c['a'],
-            'target_segment_ids': c['b'],
-            'source_filename': bn_a,
-            'target_filename': bn_b,
-            'source_file_path': str(path_a),
-            'target_file_path': str(path_a),
-            'source_prematch': a_strings['prematch'],
-            'target_prematch': b_strings['prematch'],
-            'source_match': a_strings['match'],
-            'target_match': b_strings['match'],
-            'source_postmatch': a_strings['postmatch'],
-            'target_postmatch': b_strings['postmatch'],
-            'source_year': str(a_meta.get('year', '')),
-            'target_year': str(b_meta.get('year', '')),
-            'source_author': a_meta.get('author', ''),
-            'target_author': b_meta.get('author', ''),
-            'source_title': a_meta.get('title', ''),
-            'target_title': b_meta.get('title', ''),
-            'source_url': get_url(a_meta, a_windows_to_page, c['a'], xml_page_tag),
-            'target_url': get_url(b_meta, b_windows_to_page, c['b'], xml_page_tag),
-        })
+        if counts:
+            prob = get_string_prob(a_strings['match'], b_strings['match'], counts)
+        else:
+            prob = -1
+        formatted.append({'_id': str(uuid4()),
+                          'similarity': c['sim'],
+                          'probability': prob,
+                          'source_file_id': file_id_a,
+                          'target_file_id': file_id_b,
+                          'source_segment_ids': c['a'],
+                          'target_segment_ids': c['b'],
+                          'source_filename': bn_a,
+                          'target_filename': bn_b,
+                          # these are Paths which can not be serialized to JSON without conversion
+                          'source_file_path': str(path_a),
+                          'target_file_path': str(path_a),
+                          'source_prematch': a_strings['prematch'],
+                          'target_prematch': b_strings['prematch'],
+                          'source_match': a_strings['match'],
+                          'target_match': b_strings['match'],
+                          'source_postmatch': a_strings['postmatch'],
+                          'target_postmatch': b_strings['postmatch'],
+                          'source_year': a_meta.get('year', ''),
+                          'target_year': b_meta.get('year', ''),
+                          'source_author': a_meta['author'],
+                          'target_author': b_meta['author'],
+                          'source_title': a_meta['title'],
+                          'target_title': b_meta['title'],
+                          'source_url': get_url(a_meta, a_windows_to_page, c['a'], xml_page_tag),
+                          'target_url': get_url(b_meta, b_windows_to_page, c['b'], xml_page_tag),
+                          })
     return formatted
 
 

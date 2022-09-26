@@ -71,10 +71,9 @@ def process_texts(kwargs):
     if kwargs['compute_probabilities']:
         counts = get_word_counts(kwargs['infiles'], kwargs['bounter_size'], kwargs['strip_diacritics'])
 
-    format_all_matches(counts, kwargs['metadata'], kwargs['infiles'],
-                       kwargs['strip_diacritics'], kwargs['xml_page_tag'], kwargs['xml_page_attr'],
-                       kwargs['window_length'], kwargs['slide_length'], kwargs['max_file_sim'],
-                       kwargs['excluded_file_ids'], kwargs['min_sim'], kwargs['output'],
+    format_all_matches(counts, kwargs['metadata'], kwargs['infiles'], kwargs['strip_diacritics'],
+                       kwargs['xml_page_tag'], kwargs['xml_page_attr'], kwargs['window_length'], kwargs['slide_length'],
+                       kwargs['min_sim'], kwargs['max_file_sim'], kwargs['excluded_file_ids'], kwargs['output'],
                        cache_db)
 
     # combine all matches into a single match object
