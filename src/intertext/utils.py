@@ -40,7 +40,7 @@ def get_words(path, strip_diacritics, display):
         for idx, i in enumerate(lines):
             if i == '__NEWLINE__':
                 # prevent more than two consecutive brs
-                if formatted and not formatted[-1].endswith('<br/><br/>'):
+                if len(formatted) > 0 and not formatted[-1].endswith('<br/><br/>'):
                     formatted[-1] += '<br/>'
             else:
                 formatted.append(i)
@@ -95,8 +95,7 @@ def get_window_map(path, xml_page_tag, xml_page_attr, slide_length):
 
 def parallel_map(fun, buff, **kwargs):
     process_pool = Pool()
-    f = partial(fun, **kwargs)
-    for _ in process_pool.map(f, buff):
+    for _ in process_pool.map(partial(fun, **kwargs), buff):
         pass
     process_pool.close()
     process_pool.join()

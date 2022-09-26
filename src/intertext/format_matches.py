@@ -1,7 +1,6 @@
 import json
 from uuid import uuid4
 from pathlib import Path
-from copy import deepcopy
 from collections import defaultdict
 
 from utils import get_words, get_windows, get_window_map, parallel_map
@@ -14,9 +13,9 @@ def format_all_matches(counts, metadata, infiles, strip_diacritics, xml_page_tag
     pairs = ((file_id_a, file_id_b) for file_id_a, file_id_b in cache_db.stream_matching_file_id_pairs()
              if file_id_a not in excluded_file_ids or file_id_b not in excluded_file_ids)
     parallel_map(format_file_matches, pairs, counts=counts, metadata=metadata, infiles=infiles,
-                 strip_diacritics=strip_diacritics, xml_page_tag=xml_page_tag,
-                 xml_page_attr=xml_page_attr, window_length=window_length, slide_length=slide_length,
-                 min_sim=min_sim, max_file_sim=max_file_sim, output=output, cache_db=cache_db)
+                 strip_diacritics=strip_diacritics, xml_page_tag=xml_page_tag, xml_page_attr=xml_page_attr,
+                 window_length=window_length, slide_length=slide_length, min_sim=min_sim, max_file_sim=max_file_sim,
+                 output=output, cache_db=cache_db)
 
 
 def format_file_matches(pairs, counts, metadata, infiles, strip_diacritics, xml_page_tag, xml_page_attr,
@@ -61,8 +60,8 @@ def format_file_matches(pairs, counts, metadata, infiles, strip_diacritics, xml_
                                    Path(infiles[file_id_a]), Path(infiles[file_id_b]),
                                    strip_diacritics, xml_page_tag, xml_page_attr, window_length, slide_length)
         for curr_file_id in (file_id_a, file_id_b):  # write twice per match
-            out_dir = output / 'api' / 'matches' / str(curr_file_id)
-            with open(out_dir / f'{file_id_a}-{file_id_b}.json', 'w', encoding='UTF-8') as out:
+            out_filename = output / 'api' / 'matches' / str(curr_file_id) / f'{file_id_a}-{file_id_b}.json'
+            with open(out_filename, 'w', encoding='UTF-8') as out:
                 json.dump(formatted, out, ensure_ascii=False)
 
 
@@ -73,7 +72,10 @@ def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, pat
     bn_b = path_b.name
     a_meta = metadata[bn_a]
     b_meta = metadata[bn_b]
-    file_id_a, file_id_b, clusters = order_match_pair(file_id_a, file_id_b, clusters, a_meta, b_meta)
+    # set file id a to the previously published file (if relevant)
+    if a_meta.get('year') and b_meta.get('year') and b_meta.get('year') < a_meta.get('year'):
+        file_id_a, file_id_b, clusters = file_id_b, file_id_a, [{'a': c1['b'], 'b': c1['a'], 'sim': c1['sim']}
+                                                                for c1 in clusters]
     # format the matches
     a_words = get_words(path_a, strip_diacritics, True)
     b_words = get_words(path_b, strip_diacritics, True)
@@ -92,7 +94,10 @@ def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, pat
         a_strings = get_match_strings(a_words, c['a'], window_length, slide_length)
         b_strings = get_match_strings(b_words, c['b'], window_length, slide_length)
         if counts:
-            prob = get_string_prob(a_strings['match'], b_strings['match'], counts)
+            # return the maximum probability of s1 and s2 as a float
+            probs_a = sum(counts[w] / counts.total() for w in a_strings['match'].split())
+            probs_b = sum(counts[w] / counts.total() for w in b_strings['match'].split())
+            prob = round(max(probs_a, probs_b), 3) * 1000
         else:
             prob = -1
         formatted.append({'_id': str(uuid4()),
@@ -133,14 +138,6 @@ def get_url(meta, windows_to_page, windows, xml_page_tag):
     return ret
 
 
-def order_match_pair(file_id_a, file_id_b, clusters, a_meta, b_meta):
-    """Set file id a to the previously published file (if relevant)"""
-    if a_meta.get('year') and b_meta.get('year') and b_meta.get('year') < a_meta.get('year'):
-        return [file_id_b, file_id_a, [{'a': c['b'], 'b': c['a'], 'sim': c['sim']} for c in deepcopy(clusters)]]
-    else:
-        return [file_id_a, file_id_b, clusters]
-
-
 def get_match_strings(words, window_ids, window_length, slide_length):
     """Given a list of words and window ids, format prematch, match, and postmatch strings for a match"""
     start = min(window_ids) * slide_length
@@ -161,10 +158,3 @@ def get_sequences(arg):
             sequences.append([])
         sequences[-1].append(i)
     return sequences
-
-
-def get_string_prob(a, b, counts):
-    """Return the maximum probability of s1 and s2 as a float"""
-    probs_a = sum(counts[w] / counts.total() for w in a.split())
-    probs_b = sum(counts[w] / counts.total() for w in b.split())
-    return round(max(probs_a, probs_b), 3) * 1000

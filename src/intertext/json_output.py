@@ -88,18 +88,17 @@ def write_scatterplots(output):
                     else:
                         sim = sum(sims) / len(sims)
                     o = data_nest[level][0]
-                    scatterplot_data.append({
-                        'type': i,
-                        'unit': j,
-                        'statistic': k,
-                        'key': level,
-                        'similarity': sim,
-                        'title': o[i + '_title'],
-                        'author': o[i + '_author'],
-                        'match': o[i + '_match'],
-                        'source_year': o['source_year'],
-                        'target_year': o['target_year'],
-                    })
+                    scatterplot_data.append({'type': i,
+                                             'unit': j,
+                                             'statistic': k,
+                                             'key': level,
+                                             'similarity': sim,
+                                             'title': o[f'{i}_title'],
+                                             'author': o[f'{i}_author'],
+                                             'match': o[f'{i}_match'],
+                                             'source_year': o['source_year'],
+                                             'target_year': o['target_year'],
+                                             })
                 # write the scatterplot data
                 with open(Path(out_dir) / f'{i}-{j}-{k}.json', 'w', encoding='UTF-8') as out:
                     json.dump(scatterplot_data, out, ensure_ascii=False)

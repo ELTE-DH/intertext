@@ -51,7 +51,7 @@ def process_texts(kwargs):
 
         # find all hashbands that have multiple distict file_ids
         print(' * identifying match candidates')
-        get_all_match_candidates(kwargs['only_index'], cache_db, kwargs['verbose'])
+        get_all_match_candidates(kwargs['only_id'], cache_db, kwargs['verbose'])
 
         # validate matches from among the candidates
         print(' * validating matches')

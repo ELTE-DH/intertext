@@ -8,27 +8,29 @@ config = {
     'infile_glob': '',
     'banish_glob': '',
     'exclude_glob': '',
-    'excluded_file_ids': tuple(),
+    'only_filename': '',
+    'infiles': tuple(),
     'banished_file_ids': tuple(),
+    'excluded_file_ids': tuple(),
+    'only_id': None,
     'metadata': '',  # file path will be turned to JSON loaded data structure
-    'only_index': None,
-    'output': Path('output'),
-    'cache_location': Path('cache'),
-    'xml_page_tag': None,
-    'xml_page_attr': None,
-    'chargram_length': 4,  # TODO 1,2,4 byte length Non-CLI config to be
-    'bounter_size': 64,  # TODO Non-CLI config to be
     'window_length': 14,
     'slide_length': 4,
     'hashband_length': 4,
     'hashband_step': 3,
+    'chargram_length': 4,  # TODO 1,2,4 byte length
     'banish_distance': 4,
     'min_sim': 50,
     'max_file_sim': None,
+    'output': Path('output'),
+    'cache_location': Path('cache'),
+    'xml_page_tag': None,
+    'xml_page_attr': None,
     'strip_diacritics': False,
-    'update_metadata': False,
     'verbose': False,
+    'update_metadata': False,
     'compute_probabilities': False,
+    'bounter_size': 64
 }
 
 
@@ -76,6 +78,8 @@ def parse():
                         help='path to a glob of text files to banish from matches', required=False)
     parser.add_argument('--exclude', type=str, default=config['exclude_glob'], dest='exclude_glob',
                         help='path to a glob of text files to exclude from matches', required=False)
+    parser.add_argument('--only',  type=str, default=config['only_filename'], dest='only_filename',
+                        help='only retain matches that include text from the specified file path', required=False)
     parser.add_argument('--metadata', '-m', type=load_metadata_file, default=config['metadata'],
                         help='path to a JSON metadata file (see README)', required=False)
     parser.add_argument('--window_length', '-w', type=int, default=config['window_length'],
@@ -96,6 +100,8 @@ def parse():
                         help='the maximum similarity between two files such that matches are retained', required=False)
     parser.add_argument('--output', '-o', type=Path, default=config['output'], help='the output location',
                         required=False)
+    parser.add_argument('--cache', '-c', type=Path, default=config['cache_location'], help='the cache location',
+                        required=False)
     parser.add_argument('--xml_page_tag', type=str, default=config['xml_page_tag'],
                         help='if specified, urls can reference content within this tag')
     parser.add_argument('--xml_page_attr', type=str, default=config['xml_page_attr'],
@@ -106,8 +112,6 @@ def parse():
     parser.add_argument('--verbose', '-v', default=config['verbose'],
                         help='if specified, the intertext process will log more operations', required=False,
                         action='store_true')
-    parser.add_argument('--only', default=None, dest='only_index',
-                        help='only retain matches that include text from the specified file path', required=False)
     parser.add_argument('--update_metadata', default=config['update_metadata'],
                         help='skip all processing and only update the metadata for a plot', action='store_true')
     parser.add_argument('--compute_probabilities', default=config['compute_probabilities'],
@@ -117,15 +121,15 @@ def parse():
 
     config.update(vars(parser.parse_args()))
 
+    # check xml page kwargs
+    if config.get('xml_page_tag') and not config.get('metadata'):
+        raise argparse.ArgumentTypeError('--xml_page_tag requires --metadata to be provided')
+
     return config
 
 
 def process_kwargs(kwargs):
-    """Return a list of the infiles to be processed"""
-
-    # check xml page kwargs
-    if kwargs.get('xml_page_tag') and not kwargs.get('metadata'):
-        raise argparse.ArgumentTypeError('--xml_page_tag requires --metadata to be provided')
+    """Postprocess parsing kwargs related to other kwarg values"""
 
     # identify banished files and add to infiles
     if len(kwargs['banish_glob']) > 0:
@@ -142,8 +146,14 @@ def process_kwargs(kwargs):
                                              if file_name in exclude_set})
 
     # get the focal text index number (if any) of the only file from which matches should be retained
-    if kwargs.get('only_index') is not None:
-        kwargs['only_index'] = kwargs['infiles'].index(kwargs['only_index'])
+    if len(kwargs.get('only_filename')) > 0:
+        try:
+            kwargs['only_id'] = kwargs['infiles'].index(kwargs['only_filename'])
+        except IndexError:
+            raise argparse.ArgumentTypeError(f'{kwargs["only_filename"]} not in infiles!')
+
+    if kwargs['max_file_sim'] is not None and kwargs['min_sim'] > kwargs['max_file_sim']:
+        raise argparse.ArgumentTypeError('max_file_sim can not be smaller than min_sim!')
 
     # return the processed kwargs
     return kwargs
