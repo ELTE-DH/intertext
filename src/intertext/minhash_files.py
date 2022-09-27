@@ -28,7 +28,7 @@ def get_file_hashbands(args, hasher, strip_diacritics, window_length, slide_leng
         for hdx, h in enumerate(ngrams(minhash, hashband_length)):
             if hdx % hashband_step == 0:
                 hashbands.add(('.'.join(str(i) for i in h), file_idx, window_idx))
-    if hashbands:
+    if len(hashbands) > 0:
         cache_db.write_hashbands(hashbands)
 
 

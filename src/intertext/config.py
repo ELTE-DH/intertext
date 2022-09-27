@@ -122,7 +122,7 @@ def parse():
     config.update(vars(parser.parse_args()))
 
     # check xml page kwargs
-    if config.get('xml_page_tag') and not config.get('metadata'):
+    if config['xml_page_tag'] is not None and len(config['metadata']) == 0:
         raise argparse.ArgumentTypeError('--xml_page_tag requires --metadata to be provided')
 
     return config

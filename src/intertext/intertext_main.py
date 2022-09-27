@@ -61,7 +61,7 @@ def process_texts(kwargs):
         cache_db = SQLCache('cache', db_dir=kwargs['cache_location'], verbose=kwargs['verbose'])
 
     # banish matches if necessary
-    if kwargs['banished_file_ids']:
+    if len(kwargs['banished_file_ids']) > 0:
         banish_matches(kwargs['banished_file_ids'], kwargs['banish_distance'], cache_db)
 
     # format matches into JSON for client consumption
@@ -96,9 +96,9 @@ def get_metadata(infiles, metadata):
         basename = infile.name
         if basename not in metadata:
             metadata[basename] = {}
-        if not metadata[basename].get('author'):
+        if len(metadata[basename].get('author', '')) == 0:
             metadata[basename]['author'] = 'Unknown'
-        if not metadata[basename].get('title'):
+        if len(metadata[basename].get('title')) == 0:
             metadata[basename]['title'] = basename
         for j in metadata[basename]:
             if isinstance(metadata[basename][j], str):

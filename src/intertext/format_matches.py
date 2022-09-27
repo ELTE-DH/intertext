@@ -28,8 +28,8 @@ def format_file_matches(pairs, counts, metadata, infiles, strip_diacritics, xml_
         # check to see if this file pair has >= max allowed similarity
         a_windows = get_windows(infiles[file_id_a], strip_diacritics, window_length, slide_length)
         b_windows = get_windows(infiles[file_id_b], strip_diacritics, window_length, slide_length)
-        if max_file_sim and ((len_pair_matches > len(a_windows) * max_file_sim) or
-                             (len_pair_matches > len(b_windows) * max_file_sim)):
+        if max_file_sim is not None and ((len_pair_matches > len(a_windows) * max_file_sim) or
+                                         (len_pair_matches > len(b_windows) * max_file_sim)):
             print(' * file pair', file_id_a, file_id_b, 'has >= max_file_sim; skipping!')
             return
         # cluster the matches so sequential matching windows are grouped into a single match
@@ -73,7 +73,8 @@ def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, pat
     a_meta = metadata[bn_a]
     b_meta = metadata[bn_b]
     # set file id a to the previously published file (if relevant)
-    if a_meta.get('year') and b_meta.get('year') and b_meta.get('year') < a_meta.get('year'):
+    if a_meta.get('year') is not None and b_meta.get('year') is not None and \
+            b_meta.get('year') < a_meta.get('year'):
         file_id_a, file_id_b, clusters = file_id_b, file_id_a, [{'a': c1['b'], 'b': c1['a'], 'sim': c1['sim']}
                                                                 for c1 in clusters]
     # format the matches
@@ -83,7 +84,7 @@ def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, pat
     # fetch a mapping from window id to $PAGE elements if necessary
     a_windows_to_page = None
     b_windows_to_page = None
-    if xml_page_tag:
+    if xml_page_tag is not None:
         try:
             a_windows_to_page = get_window_map(path_a, xml_page_tag, xml_page_attr, slide_length)
             b_windows_to_page = get_window_map(path_b, xml_page_tag, xml_page_attr, slide_length)
@@ -93,7 +94,7 @@ def format_matches(file_id_a, file_id_b, clusters, counts, metadata, path_a, pat
     for c in clusters:
         a_strings = get_match_strings(a_words, c['a'], window_length, slide_length)
         b_strings = get_match_strings(b_words, c['b'], window_length, slide_length)
-        if counts:
+        if counts is not None:
             # return the maximum probability of s1 and s2 as a float
             probs_a = sum(counts[w] / counts.total() for w in a_strings['match'].split())
             probs_b = sum(counts[w] / counts.total() for w in b_strings['match'].split())
@@ -154,7 +155,7 @@ def get_sequences(arg):
     sequences = []
     for i in sorted(set(arg)):
         # check if each is 1 more than the last, as segment ids increment by 1
-        if not sequences or sequences[-1][-1] != i - 1:
+        if len(sequences) == 0 or sequences[-1][-1] != i - 1:
             sequences.append([])
         sequences[-1].append(i)
     return sequences
