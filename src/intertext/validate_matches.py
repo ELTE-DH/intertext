@@ -1,5 +1,5 @@
 from difflib import SequenceMatcher
-
+from sandbox import ratio_max_mach
 from utils import get_windows, parallel_map
 
 
@@ -28,7 +28,9 @@ def validate_file_matches(pairs, strip_diacritics, min_sim, cache_db, window_len
             print(file_id_a, window_id_a, len(file_a_windows), file_path_a)
             print(file_id_b, window_id_b, len(file_b_windows), file_path_b)
             continue
-        sim = SequenceMatcher(a=text_a, b=text_b, autojunk=False).ratio() * 100
+        #s = SequenceMatcher(a=text_a, b=text_b, autojunk=True)
+        # sim = s.ratio() * 100
+        sim = ratio_max_mach(text_a, text_b) * 100
         if sim >= min_sim:
             # remove matches with predominance of single character words
             a_singles = sum(int(len(i) == 1) for i in text_a.split())
