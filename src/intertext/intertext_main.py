@@ -56,7 +56,7 @@ def process_texts(kwargs):
         # validate matches from among the candidates
         print(' * validating matches')
         validate_all_matches(kwargs['infiles'], kwargs['strip_diacritics'], kwargs['window_length'],
-                             kwargs['slide_length'], kwargs['min_sim'], cache_db)
+                             kwargs['slide_length'], kwargs['min_sim'], cache_db, kwargs['match_algo'])
     else:
         cache_db = SQLCache('cache', db_dir=kwargs['cache_location'], verbose=kwargs['verbose'])
 

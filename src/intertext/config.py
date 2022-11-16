@@ -30,7 +30,8 @@ config = {
     'verbose': False,
     'update_metadata': False,
     'compute_probabilities': False,
-    'bounter_size': 64
+    'bounter_size': 64,
+    'match_algo': 'built-in',
 }
 
 
@@ -118,6 +119,9 @@ def parse():
                         help='compute the likelihood of strings in the corpus', action='store_true')
     parser.add_argument('--bounter_size', default=config['bounter_size'], help='MB allocated to bounter instance',
                         required=False)
+    # nargs=? means one or zero values: allows opt without value -> returns const, if totally omitted -> returns default
+    parser.add_argument('--improved_match_algo', nargs='?', const='improved', default=config['match_algo'],
+                        help='Improved match validation algorithm (default: built-in)', required=False)
 
     config.update(vars(parser.parse_args()))
 
