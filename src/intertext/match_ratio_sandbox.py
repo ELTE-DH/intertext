@@ -6,29 +6,6 @@ def purge_string(input_string):
     return d.lower()
 
 
-def ratio_del_ins(a, b):
-    equal_len = 0
-    del_set = set()
-    ins_set = set()
-    s = SequenceMatcher(a=a, b=b, autojunk=False)
-    max_mach = s.find_longest_match()
-    a_low = max_mach[0]
-    match_size = max_mach[2]
-    print(a[a_low:a_low + match_size], s.ratio())
-    for tag, i1, i2, j1, j2 in s.get_opcodes():
-        if tag == 'equal':
-            equal_len += i2 - i1
-        if tag == 'delete':
-            del_set.add(a[i1:i2])
-        if tag == 'insert':
-            ins_set.add(b[j1:j2])
-        print(f'{tag:7}   a[{i1}:{i2}] --> b[{j1}:{j2}] {repr(a[i1:i2]):>8} --> {repr(b[j1:j2])}')
-    avg_len = len(a) + len(b) / 2
-    print(equal_len / avg_len)
-    del_ins_len = len(''.join(item for item in del_set.intersection(ins_set)))
-    print((equal_len + del_ins_len) / avg_len)
-
-
 def ratio_max_mach_built_in(a, b, min_len):
     """Built-in ratio algorithm"""
     s = SequenceMatcher(a=a, b=b)
@@ -42,14 +19,14 @@ def ratio_max_mach(a, b, min_len):
     b = purge_string(b)
     avg_len = (len(a) + len(b) / 2)
     equal = 0
-    match_len = 6
+    match_len = 100
     # i = 1
     while match_len > min_len:
         s = SequenceMatcher(a=a, b=b, autojunk=False)
         # print(f'Egyezési arány az {i}-edik körben: {s.ratio()}')
         # i += 1
         a_low, b_low, match_len = s.find_longest_match()
-        equal += match_len[2]
+        equal += match_len
         # print(a[a_low:(a_low + match_len)])
         # Cut the matching part
         a = a[:a_low] + a[a_low + match_len:]
