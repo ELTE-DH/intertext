@@ -49,7 +49,7 @@ def ratio_max_mach(a, b, min_len):
         # print(f'Egyezési arány az {i}-edik körben: {s.ratio()}')
         # i += 1
         a_low, b_low, match_len = s.find_longest_match()
-        equal += match_len[2]
+        equal += match_len
         # print(a[a_low:(a_low + match_len)])
         # Cut the matching part
         a = a[:a_low] + a[a_low + match_len:]

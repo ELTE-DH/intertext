@@ -121,10 +121,10 @@ def parse():
     parser.add_argument('--bounter_size', default=config['bounter_size'], help='MB allocated to bounter instance',
                         required=False)
     # nargs=? means one or zero values: allows opt without value -> returns const, if totally omitted -> returns default
-    parser.add_argument('--improved_match_algo', nargs='?', const='improved', default=config['match_algo'],
-                        help='Improved match validation algorithm (default: built-in)', required=False)
-    parser.add_argument('--min_len', default=config['min_len'], help='Minimal length to cut in when validating matches',
-                        required=False)
+    parser.add_argument('--improved_match_algo', dest='match_algo', nargs='?', const='improved', required=False,
+                        default=config['match_algo'], help='Improved match validation algorithm (default: built-in)')
+    parser.add_argument('--min_len', type=int, default=config['min_len'],
+                        help='Minimal length to cut in when validating matches', required=False)
 
     config.update(vars(parser.parse_args()))
 
