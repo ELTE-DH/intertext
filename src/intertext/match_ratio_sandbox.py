@@ -29,31 +29,31 @@ def ratio_del_ins(a, b):
     print((equal_len + del_ins_len) / avg_len)
 
 
-def ratio_max_mach_built_in(a, b):
+def ratio_max_mach_built_in(a, b, min_len):
     """Built-in ratio algorithm"""
     s = SequenceMatcher(a=a, b=b)
     sim = s.ratio() * 100
     return sim
 
 
-def ratio_max_mach(a, b):
+def ratio_max_mach(a, b, min_len):
     """An improved (?) version"""
     a = purge_string(a)
     b = purge_string(b)
     avg_len = (len(a) + len(b) / 2)
     equal = 0
-    match_size = 6
+    match_len = 6
     # i = 1
-    while match_size > 5:
+    while match_len > min_len:
         s = SequenceMatcher(a=a, b=b, autojunk=False)
         # print(f'Egyezési arány az {i}-edik körben: {s.ratio()}')
         # i += 1
-        a_low, b_low, match_size = s.find_longest_match()
-        equal += match_size[2]
-        # print(a[a_low:(a_low + match_size)])
+        a_low, b_low, match_len = s.find_longest_match()
+        equal += match_len[2]
+        # print(a[a_low:(a_low + match_len)])
         # Cut the matching part
-        a = a[:a_low] + a[a_low + match_size:]
-        b = b[:b_low] + b[b_low + match_size:]
+        a = a[:a_low] + a[a_low + match_len:]
+        b = b[:b_low] + b[b_low + match_len:]
     # print(equal, sum_len)
     return (equal / avg_len) * 100
 
@@ -67,18 +67,51 @@ def cut_a_word(string, direction):
     return string
 
 
+def cut_edges(a, b, minlength):
+    change = False
+    a_rstrip = cut_a_word(a, "right")
+    b_rstrip = cut_a_word(b, "right")
+    a_lstrip = cut_a_word(a, "left")
+    b_lstrip = cut_a_word(b, "left")
+
+    if ratio_max_mach(a, b, minlength) < ratio_max_mach(a_rstrip, b, minlength):
+        a = a_rstrip
+        change = True
+    if ratio_max_mach(a, b, minlength) < ratio_max_mach(b_rstrip, a, minlength):
+        b = b_rstrip
+        change = True
+    if ratio_max_mach(a, b, minlength) < ratio_max_mach(a_lstrip, b, minlength):
+        a = a_lstrip
+        change = True
+    if ratio_max_mach(a, b, minlength) < ratio_max_mach(b_lstrip, a, minlength):
+        b = b_lstrip
+        change = True
+
+    return a, b, change
+
+
 if __name__ == '__main__':
 
-    x = ' mindenki fülébe a harang szava.(isa, por) Minden csillogott-villogott, csak a por nem. Az egyenruhás ' \
-        'alakok szájából nagy, kacskaringós, sárga csövek nőttek ki, amik azután kiszélesedtek (mintegy kihajoltak ' \
-        'önmagukból), akár a tökvirág. – Fúvós hangszer – biccentett Fancsikó. A tanácsháza előtt '
-    y = ' barnásodás” se! És, pardőz, az illat, az se.) Minden csillogott-villogott, csak a por nem. Az egyenruhás ' \
-        'alakok szájából nagy, kacskaringós sárga csövek nőttek ki, amik aztán kiszélesedtek (mintegy kihajoltak ' \
-        'önmagukból), akár a tökvirág. „Mjuzik” – mondta a mester édesapja fenyegetően. A sor '
+    x = ' ajtón átverekedtük magunkat. A fürdőszobáét meglengettem, ahogy egy könyvet lapoznék. Lábujjhegyen ' \
+        '(tipegve) becserkésztük apámat, akinek fehér teste, mint színehagyott moszat lebegett a kádban. A test ' \
+        'körvonalai meglazultak: gyanús átmenetek képződtek egyik-másik vízhullámmal; igaz, az a néhány kemény ' \
+        'kontúr a fej környékén sem volt biztatóbb. Azt természetesen azért nem gondolhattuk, hogy egyszerre csak ' \
+        'föloldódik az édesapám a fürdővízben. A nyakával egy szinten, a dereka vonalában deszkahíd ívelt a kád ' \
+        'fölé. Valahonnét, sok ütközés után, egy marék napfény került ide, s tette láthatóvá – a porszemek által – a ' \
+        'levegőt. Fancsikó ripacskodott a porszemeken ugrálva. '
+    y = 'De aztán Marci úr meglengeti a fürdőszoba ajtót, ahogy egy könyvet lapozna (kettőt!), lábujjhegyen – ' \
+        'tipegve – becserkészi a mesterrel közös apját, akinek fehér teste, mint színehagyott moszat lebeg a kádban. ' \
+        'A test körvonalai meglazultak: gyanús átmenetek képződtek egyik-másik vízhullámmal; igaz, az a néhány kemény ' \
+        'kontúr a fej környékén sem biztatóbb. Azt azért nem gondolhatják, hogy egyszerre csak feloldódik az apjuk a ' \
+        'fürdővízben. A nyakával egy szinten, a derék vonalában deszkahíd ível a kád fölé. Valahonnét, sok ütközés ' \
+        'után, marék napfény kerül ide; s teszi láthatóvá – a porszemek által – a levegőt. A porszemeken senki. ' \
+        '(„Kell? nem kell!”) Jobb kézről, két'
 
-    while ratio_max_mach(x, y) <= ratio_max_mach(cut_a_word(x, 'left'), y):
-        x = cut_a_word(x, 'left')
-        print(x)
+    changed = True
+    while changed:
+        (x, y, changed) = cut_edges(x, y, 5)
+
+    print(x, y, sep='\n')
 
     # x = purge_string(x)
     # y = purge_string(y)

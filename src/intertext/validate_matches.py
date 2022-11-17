@@ -3,15 +3,16 @@ from match_ratio_sandbox import ratio_max_mach, ratio_max_mach_built_in
 
 
 # Only this function is public in this file!
-def validate_all_matches(infiles, strip_diacritics, window_length, slide_length, min_sim, cache_db, match_algo):
+def validate_all_matches(infiles, strip_diacritics, window_length, slide_length, min_sim, cache_db, match_algo,
+                         min_len):
     """Run match validations and yield [a_file,b_file,a_window,b_window]"""
     pairs = [(infiles[file_id_a], infiles[file_id_b], file_id_a, file_id_b)
              for file_id_a, file_id_b in cache_db.stream_candidate_file_id_pairs()]
     parallel_map(validate_file_matches, pairs, strip_diacritics=strip_diacritics, min_sim=min_sim, cache_db=cache_db,
-                 window_length=window_length, slide_length=slide_length, match_algo=match_algo)
+                 window_length=window_length, slide_length=slide_length, match_algo=match_algo, min_len=min_len)
 
 
-def validate_file_matches(pairs, strip_diacritics, min_sim, cache_db, window_length, slide_length, match_algo):
+def validate_file_matches(pairs, strip_diacritics, min_sim, cache_db, window_length, slide_length, match_algo, min_len):
     """Validate the matches for a single file pair and return [a_file,b_file,a_window,b_window]"""
     file_path_a, file_path_b, file_id_a, file_id_b = pairs
     matches = []
@@ -33,7 +34,7 @@ def validate_file_matches(pairs, strip_diacritics, min_sim, cache_db, window_len
             print(file_id_a, window_id_a, len(file_a_windows), file_path_a)
             print(file_id_b, window_id_b, len(file_b_windows), file_path_b)
             continue
-        sim = match_fun(text_a, text_b)
+        sim = match_fun(text_a, text_b, min_len)
         if sim >= min_sim:
             # remove matches with predominance of single character words
             a_singles = sum(int(len(i) == 1) for i in text_a.split())
