@@ -98,7 +98,7 @@ def get_metadata(infiles, metadata):
             metadata[basename] = {}
         if len(metadata[basename].get('author', '')) == 0:
             metadata[basename]['author'] = 'Unknown'
-        if len(metadata[basename].get('title')) == 0:
+        if len(metadata[basename].get('title', '')) == 0:
             metadata[basename]['title'] = basename
         for j in metadata[basename]:
             if isinstance(metadata[basename][j], str):
