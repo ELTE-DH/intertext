@@ -280,6 +280,18 @@ def _cut_bytes(b, n=4, offset=0):
     b_view = b_view[offset: end - (end % n) + offset]
     return np.frombuffer(b_view, dtype=dtypes[n])
 
+    b_view = b_view[offset: len(b) - offset - ((len(b) - offset) % n)]
+
+def _cut_bytes_alt(b, n=4, offset=0):  # offset=0,1,2,3
+    end = len(b) - offset  # offset=len(b),len(b)-1, len(b)-2, len(b)-3
+    b_view = np.frombuffer(b, dtype=np.uint8)
+
+    # len_b - ((len_b - offset) % 4)
+    # 0: len(b) len(b) % 4 + 0, 1: len(b) len(b) % 4 + 0
+    b_view = b_view[offset: len(b) - ((len(b) - offset) % 4)]
+    b_view = b_view[offset: end - (end % n) + offset]
+    return np.frombuffer(b_view, dtype=np.uint32)  # 4 hosszú (valószínűleg 4 karakter) eltoltásait akarja csinálni
+
 
 def byte_hashes(b, n=4):
     """
@@ -290,6 +302,12 @@ def byte_hashes(b, n=4):
     """
     if n not in [1, 2, 4]:
         raise ValueError('n must be in [1,2,4]')
+    # 4 hosszú (valószínűleg 4 karakter) eltoltásait akarja csinálni és hogy stackeli őket?
+    # 0 4 8, stb
+    # 1 5 9, stb
+    # 2 6 10, stb
+    # 3 7 11, stb.
+    # Ezeket uniq-olja.
     h = np.hstack([_cut_bytes(b, n, offset) for offset in range(n)])
     h = np.unique(h)
     return h
