@@ -31,11 +31,11 @@ venv:
 .PHONY: venv
 
 build: venv __extra-deps
-	@poetry build
+	@./venv/bin/poetry build
 .PHONY: build
 
 install: build
-	 @poetry run pip install --upgrade dist/*.whl
+	 @./venv/bin/poetry run pip install --upgrade dist/*.whl
 .PHONY: install
 
 run_sample: install
