@@ -4,8 +4,6 @@
 
 Intertext uses machine learning and interactive visualizations to identify and display intertextual patterns in text collections. The text processing is based on minhashing vectorized strings and the web viewer is based on interactive React components. [[Demo](https://lab-apps.s3-us-west-2.amazonaws.com/intertext/redesign/index.html)]
 
-![App preview](/docs/preview.png?raw=true)
-
 # Installation
 
 To install Intertext, run the steps below:
