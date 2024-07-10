@@ -30,7 +30,9 @@ config = {
     'verbose': False,
     'update_metadata': False,
     'compute_probabilities': False,
-    'bounter_size': 64
+    'bounter_size': 64,
+    'about_files_dir': None,
+    'image_directory': None
 }
 
 
@@ -78,7 +80,7 @@ def parse():
                         help='path to a glob of text files to banish from matches', required=False)
     parser.add_argument('--exclude', type=str, default=config['exclude_glob'], dest='exclude_glob',
                         help='path to a glob of text files to exclude from matches', required=False)
-    parser.add_argument('--only',  type=str, default=config['only_filename'], dest='only_filename',
+    parser.add_argument('--only', type=str, default=config['only_filename'], dest='only_filename',
                         help='only retain matches that include text from the specified file path', required=False)
     parser.add_argument('--metadata', '-m', type=load_metadata_file, default=config['metadata'],
                         help='path to a JSON metadata file (see README)', required=False)
@@ -118,6 +120,10 @@ def parse():
                         help='compute the likelihood of strings in the corpus', action='store_true')
     parser.add_argument('--bounter_size', default=config['bounter_size'], help='MB allocated to bounter instance',
                         required=False)
+    parser.add_argument('--about_files_dir', default=config['about_files_dir'],
+                        help='Directory where different lang about-HTML files are stored.', required=False)
+    parser.add_argument('--image_directory', default=config['image_directory'],
+                        help='Directory where images are stored.', required=False)
 
     config.update(vars(parser.parse_args()))
 
@@ -151,6 +157,27 @@ def process_kwargs(kwargs):
             kwargs['only_id'] = kwargs['infiles'].index(kwargs['only_filename'])
         except IndexError:
             raise argparse.ArgumentTypeError(f'{kwargs["only_filename"]} not in infiles!')
+
+    # extract HTML files from about_files_dir if passed
+    about_files_dir = kwargs['about_files_dir']
+    about_files_htmls = []
+    if about_files_dir is not None:
+        about_files_dir = Path(about_files_dir)
+        kwargs['about_files_dir'] = about_files_dir
+        if not about_files_dir.is_dir():
+            raise ValueError(f'{about_files_dir} should be a directory for about_files_dir!')
+        about_files_htmls = [f'api/about/{p.name}' for p in about_files_dir.glob('*.html')]
+        if len(about_files_htmls) == 0:
+            raise ValueError(f'{about_files_dir} contains no HTML files!')
+    kwargs['about_files'] = about_files_htmls
+
+    # add image directory Path
+    image_directory = kwargs['image_directory']
+    if image_directory is not None:
+        image_directory = Path(image_directory)
+        kwargs['image_directory'] = image_directory
+        if not image_directory.is_dir():
+            raise ValueError(f'{image_directory} is not a directory!')
 
     if kwargs['max_file_sim'] is not None and kwargs['min_sim'] > kwargs['max_file_sim']:
         raise argparse.ArgumentTypeError('max_file_sim can not be smaller than min_sim!')

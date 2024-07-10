@@ -36,7 +36,8 @@ def process_texts(kwargs):
     kwargs['metadata'] = get_metadata(kwargs['infiles'], kwargs['metadata'])
 
     # create the output directories where results will be stored
-    prepare_output_directories(kwargs['output'], kwargs['cache_location'], kwargs['infiles'])
+    prepare_output_directories(kwargs['output'], kwargs['cache_location'], kwargs['infiles'], kwargs['about_files_dir'],
+                               kwargs['image_directory'])
 
     # update the metadata and exit if requested
     if not kwargs.get('update_metadata'):
@@ -83,7 +84,7 @@ def process_texts(kwargs):
     # write the output config file
     print(' * writing config')
     write_config(kwargs['infiles'], kwargs['metadata'], kwargs['excluded_file_ids'], kwargs['banished_file_ids'],
-                 kwargs['output'], kwargs['window_length'], kwargs['slide_length'])
+                 kwargs['output'], kwargs['window_length'], kwargs['slide_length'], kwargs['about_files'])
 
     # copy input texts into outputs
     print(' * preparing text reader data')
@@ -107,13 +108,21 @@ def get_metadata(infiles, metadata):
     return metadata
 
 
-def prepare_output_directories(output, cache_location, infiles):
+def prepare_output_directories(output, cache_location, infiles, about_files_dir, image_directory):
     """Create the folders that store output objects"""
     # Copy the client to the output directory
     if output.exists():
         rmtree(output)
     # copy the `build` directory to the output directory
     copytree(Path(__file__).parent / 'client' / 'build', output)
+
+    # copy the 'about_files_dir' directory to the api directory if passed (error handling done in process_kwargs)
+    if about_files_dir is not None:
+        copytree(about_files_dir, output / 'api' / 'about')
+
+    # copy the 'image_directory' directory to the api directory if passed (error handling done in process_kwargs)
+    if image_directory is not None:
+        copytree(image_directory, output / 'api' / 'images')
 
     for i in ('matches', 'scatterplots', 'indices', 'texts'):
         (output / 'api' / i).mkdir(parents=True, exist_ok=True)
@@ -155,15 +164,23 @@ def get_word_counts(infiles, bounter_size, strip_diacritics):
     return counts
 
 
-def write_config(infiles, inp_metadata, excluded_file_ids, banished_file_ids, output, window_length, slide_length):
+def write_config(infiles, inp_metadata, excluded_file_ids, banished_file_ids, output, window_length, slide_length,
+                 about_files):
     # map each author and title to the files in which that string occurs and save those maps
     metadata = []
     for idx, infile in enumerate(infiles):
         if infile not in excluded_file_ids and infile not in banished_file_ids:
             file_meta = inp_metadata[infile.name]
+
+            image = file_meta.get('image', 'default')
+            if image != 'default':
+                image = str(Path('api') / 'images' / Path(image).name)
+
             metadata.append({'id': idx,
                              'author': file_meta['author'],
                              'title': file_meta['title'],
+                             'year': file_meta['year'],
+                             'image': image,
                              # we need the results here
                              'matches': (output / 'api' / 'matches' / f'{idx}.json').stat().st_size > 2,
                              })
@@ -172,6 +189,7 @@ def write_config(infiles, inp_metadata, excluded_file_ids, banished_file_ids, ou
                    'metadata': metadata,
                    'window_size': window_length,
                    'window_slide': slide_length,
+                   'about_files': about_files
                    }, out, ensure_ascii=False)
 
 
