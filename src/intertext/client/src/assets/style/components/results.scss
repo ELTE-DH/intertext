@@ -1,0 +1,37 @@
+.results {
+  flex: 1;
+  margin-top: 20px;
+  overflow-y: scroll;
+}
+
+@media (min-width: 1490px) {
+  .results {
+    .result-pair {
+      .MuiDivider-root {
+        margin: 0 30px;
+      }
+    }
+  }
+}
+
+@media (max-height: 800px) {
+  .results {
+    .result-pair {
+      .MuiCardHeader-root {
+        padding: 10px 15px;
+      }
+    }
+  }
+}
+
+@media (max-height: 760px) {
+  .results {
+    .result-pair {
+      .MuiCard-root {
+        .MuiCardActions-root {
+          padding: 5px 15px;
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+.about-page {
+  height: 100%;
+
+  .about-card {
+    flex: 1;
+    padding: 30px;
+
+    .content {
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .error-message {
+      text-align: center;
+      font-style: italic;
+    }
+  }
+}

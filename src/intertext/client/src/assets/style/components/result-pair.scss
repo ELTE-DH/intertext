@@ -1,0 +1,71 @@
+.result-pair {
+  display: flex;
+  margin-bottom: 20px;
+
+  .MuiCard-root {
+    width: 300px;
+    min-width: 300px;
+    border: 2px solid $white;
+    border-color: $intertext-color;
+  }
+
+  .MuiChip-root {
+    background-color: $intertext-color;
+    color: $white;
+  }
+
+  .result-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+
+    .MuiCardHeader-root,
+    .MuiCardHeader-content {
+      overflow: hidden;
+    }
+
+    .MuiCardHeader-title {
+      max-width: 90%;
+      @extend %ellipsis;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: space-evenly;
+      border-top: 1px solid rgba($intertext-color, 0.3);
+      border-bottom: 1px solid rgba($intertext-color, 0.3);
+
+      .MuiButtonBase-root {
+        color: $intertext-color;
+        gap: 5px;
+        align-items: flex-start;
+
+        &:hover {
+          background-color: $white;
+        }
+      }
+    }
+
+    .text {
+      font-size: 14px;
+      padding: 15px 30px 20px;
+    }
+
+    .prematch,
+    .postmatch {
+      color: $grey;
+    }
+
+    .match {
+      font-weight: 500;
+    }
+  }
+
+  .MuiCardContent-root {
+    padding: 0;
+  }
+
+  .MuiCardContent-root:last-child {
+    padding-bottom: 0;
+  }
+}

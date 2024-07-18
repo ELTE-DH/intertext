@@ -1,0 +1,33 @@
+.cards-page {
+  display: flex;
+  height: 100%;
+  gap: 30px;
+
+  .content-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .content-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-self: flex-start;
+    gap: 20px;
+    height: 100%;
+
+    .results-number-card {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 55px;
+    }
+  }
+}
+
+@media (max-height: 879px) {
+  .cards-page .content-left .results-number-card {
+    display: none;
+  }
+}

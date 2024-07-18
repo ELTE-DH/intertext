@@ -1,0 +1,14 @@
+.language-selector {
+  .MuiInputBase-root {
+    width: 75px;
+    border-radius: 20px;
+
+    &.Mui-focused fieldset {
+      border-color: $intertext-color;
+    }
+  }
+
+  fieldset {
+    border-color: $intertext-color;
+  }
+}

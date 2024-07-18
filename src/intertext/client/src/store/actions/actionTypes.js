@@ -1,0 +1,26 @@
+// Config
+export const SET_METADATA = 'SET_METADATA';
+export const SET_FILE_IDS_BY_FIELD = 'SET_FILE_IDS_BY_FIELD';
+
+// Search
+export const SET_MATCH_IDS_BY_SORT = 'SET_MATCH_IDS_BY_SORT';
+export const SET_RESULTS = 'SET_RESULTS';
+export const SET_SEARCH_FIELD = 'SET_SEARCH_FIELD';
+export const SET_SEARCH_QUERY = 'SET_SEARCH_QUERY';
+export const SET_AUTOCOMPLETE_DROPDOWN_OPTIONS = 'SET_AUTOCOMPLETE_DROPDOWN_OPTIONS';
+export const SET_IS_LOADING = 'SET_IS_LOADING';
+
+// Advanced search
+export const SET_ADVANCED_SEARCH = 'SET_ADVANCED_SEARCH';
+
+// Read
+export const SET_CURRENT_TEXT = 'SET_CURRENT_TEXT';
+
+// Visualization
+export const SET_CURRENT_CARD_DATA = 'SET_CURRENT_CARD_DATA';
+export const SET_CHART_DATA = 'SET_CHART_DATA';
+export const SET_VISUALIZED_BY = 'SET_VISUALIZED_BY';
+export const SET_CLICKED_ELEMENT = 'SET_CLICKED_ELEMENT';
+
+// Locale
+export const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE';

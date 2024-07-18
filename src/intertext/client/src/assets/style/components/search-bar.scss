@@ -1,0 +1,131 @@
+.content-right .search-bar {
+  .results-number,
+  .results-number-divider {
+    display: none;
+  }
+
+  .sort-container {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .sort-by {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    .MuiInputBase-root {
+      width: 105px;
+      border-radius: 20px;
+
+      .MuiSelect-select {
+        padding: 5px 0 5px 10px;
+      }
+
+      fieldset {
+        border: 1px solid $intertext-color;
+      }
+    }
+  }
+
+  .search {
+    display: flex;
+    flex: 1;
+    gap: 15px;
+
+    .search-button {
+      height: 34px;
+      align-items: center;
+      padding: 0;
+    }
+  }
+
+  .search-input-container {
+    display: flex;
+    align-items: center;
+    flex: 1;
+  }
+
+  .search-by {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+
+    // Search by select input
+    .MuiInputBase-root {
+      width: 80px;
+
+      .MuiSelect-select {
+        padding: 0;
+      }
+
+      fieldset {
+        border: none;
+      }
+    }
+  }
+
+  .autocomplete-input {
+    flex: 1;
+
+    .MuiInputBase-root {
+      border-radius: 20px;
+      border-color: $intertext-color;
+      padding: 3px 40px 3px 10px;
+
+      fieldset {
+        border-color: $intertext-color;
+      }
+    }
+  }
+
+  .MuiAutocomplete-popper {
+    .MuiAutocomplete-option {
+      &[aria-selected='true'] {
+        background-color: rgba($intertext-color, 0.3);
+      }
+
+      &:hover {
+        background-color: rgba($intertext-color, 0.5);
+      }
+    }
+  }
+}
+
+@media (max-width: 1400px) {
+  .content-right .search-bar {
+    gap: 10px;
+  }
+}
+
+@media (max-height: 879px) {
+  .content-right .search-bar {
+    .results-number,
+    .results-number-divider {
+      display: block;
+    }
+  }
+}
+
+@media (max-height: 759px) {
+  .content-right .search-bar.subheader-card.MuiPaper-root.MuiCard-root {
+    height: 40px;
+    gap: 15px;
+    padding: 0 20px;
+
+    .MuiAutocomplete-root .MuiOutlinedInput-root.MuiInputBase-sizeSmall {
+      padding: 0px 40px 0px 10px;
+    }
+
+    .search {
+      align-items: center;
+    }
+
+    .search .search-button,
+    .sort-by .MuiInputBase-root,
+    .autocomplete-input .MuiInputBase-root {
+      height: 30px;
+    }
+  }
+}

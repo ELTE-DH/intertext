@@ -1,0 +1,120 @@
+.advanced-search {
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  flex: 1;
+
+  .MuiCardContent-root {
+    display: flex;
+    justify-content: space-around;
+    flex-direction: column;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  }
+
+  .MuiCardActions-root {
+    padding: 10px;
+    justify-content: space-around;
+  }
+
+  .title {
+    padding: 18px;
+    text-align: center;
+  }
+
+  .MuiSlider-root {
+    color: $intertext-color;
+    width: 95%;
+  }
+
+  .MuiSlider-thumb:hover,
+  .MuiSlider-thumb.Mui-focusVisible {
+    box-shadow: 0px 0px 0px 8px rgba($intertext-color, 0.2);
+  }
+
+  .slider-container {
+    text-align-last: center;
+  }
+
+  .filter-container {
+    font-size: 16px;
+  }
+
+  .earlier-text {
+    margin-bottom: 10px;
+  }
+
+  .match-length {
+    margin-bottom: 10px;
+  }
+
+  .text-field-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .MuiInputBase-root {
+    border-radius: 20px;
+  }
+
+  .label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .MuiFormLabel-root {
+    font-size: 16px;
+  }
+
+  .MuiOutlinedInput-root:hover fieldset {
+    border-color: $intertext-color;
+  }
+
+  .MuiInputLabel-root.Mui-focused {
+    color: $intertext-color;
+  }
+
+  .MuiInputBase-root.Mui-focused fieldset {
+    border-color: $intertext-color;
+  }
+
+  .button-container {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+  }
+}
+
+@media (max-height: 879px) {
+  .advanced-search {
+    .filter-container,
+    .MuiFormLabel-root,
+    .MuiInputBase-root {
+      font-size: 14px;
+    }
+
+    .MuiInputBase-root,
+    .MuiInputBase-input {
+      height: 35px;
+    }
+
+    .MuiInputBase-input {
+      padding: 0 15px;
+    }
+  }
+}
+
+@media (max-height: 759px) {
+  .advanced-search {
+    .title {
+      padding: 10px;
+    }
+
+    .MuiCardContent-root {
+      padding: 5px 15px;
+    }
+  }
+}

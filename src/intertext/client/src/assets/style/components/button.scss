@@ -1,0 +1,22 @@
+// Material UI contained primary button
+.MuiButtonBase-root.MuiButton-containedPrimary {
+  width: 100px;
+  height: 34px;
+  background-color: $intertext-color;
+  border-radius: 20px;
+
+  &:hover {
+    background-color: $intertext-color-dark;
+  }
+}
+
+.MuiButtonBase-root.MuiButton-root {
+  text-transform: capitalize;
+}
+
+@media (max-height: 759px) {
+  .MuiButtonBase-root.MuiButton-containedPrimary {
+    height: 30px;
+    padding: 0;
+  }
+}

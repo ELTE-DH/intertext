@@ -1,0 +1,15 @@
+.MuiPaper-root.MuiCard-root {
+  border-radius: 15px;
+
+  .MuiCardHeader-root {
+    padding: 10px 15px;
+
+    .MuiCardHeader-title {
+      font-size: 16px;
+    }
+  }
+
+  .MuiCardContent-root {
+    flex: 1;
+  }
+}

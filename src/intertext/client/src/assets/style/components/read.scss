@@ -1,0 +1,15 @@
+.read-page {
+  height: 100%;
+  align-items: center;
+
+  .subheader-card {
+    width: 80%;
+  }
+
+  .text-container {
+    flex: 1;
+    padding: 30px;
+    overflow-y: scroll;
+    width: 80%;
+  }
+}

@@ -1,0 +1,12 @@
+// Material UI select popover
+.MuiPopover-root .MuiPaper-root ul {
+  padding: 0;
+
+  .Mui-selected {
+    background-color: rgba($intertext-color, 0.3);
+  }
+
+  li:hover {
+    background-color: rgba($intertext-color, 0.5);
+  }
+}

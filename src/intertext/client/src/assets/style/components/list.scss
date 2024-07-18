@@ -1,0 +1,26 @@
+.list-page {
+  .list-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    margin: 0 auto 20px;
+    width: 80%;
+  }
+
+  .list-info-container {
+    border-left: 3px solid $intertext-color;
+    padding-left: 10px;
+
+    .author {
+      font-size: 18px;
+      margin-bottom: 5px;
+      color: $intertext-color;
+    }
+  }
+
+  .search-icon {
+    color: $intertext-color;
+    cursor: pointer;
+  }
+}

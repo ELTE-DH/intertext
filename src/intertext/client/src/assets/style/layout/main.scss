@@ -1,0 +1,22 @@
+main {
+  height: calc(100% - 100px);
+  padding: 20px 60px;
+  font-family: 'Roboto';
+  background-color: $lighter-grey;
+  color: $text-default-color;
+}
+
+main:has(.visualization-page .result-pair) {
+  height: auto;
+}
+
+main:has(.list-page) {
+  overflow-y: scroll;
+}
+
+@media (max-height: 720px) {
+  main {
+    height: calc(100% - 140px);
+    padding: 15px 50px;
+  }
+}

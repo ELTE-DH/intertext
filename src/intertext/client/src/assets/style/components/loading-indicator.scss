@@ -1,0 +1,8 @@
+.loading-container {
+  margin-top: 20px;
+  text-align: center;
+
+  .MuiCircularProgress-root {
+    color: $intertext-color;
+  }
+}

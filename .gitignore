@@ -134,4 +134,8 @@ dmypy.json
 # Project specific files
 cache/
 output/
+# Client build related
 !src/intertext/client/build
+src/intertext/client/node_modules
+# Explicitly allow, because directory named "lib"
+!src/intertext/client/src/components/charts/lib
